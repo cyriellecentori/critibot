@@ -3,7 +3,6 @@ package tk.cyriellecentori.CritiBot;
 
 import java.util.Vector;
 
-import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 

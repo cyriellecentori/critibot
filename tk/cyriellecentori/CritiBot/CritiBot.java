@@ -6,13 +6,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.sql.Time;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.Stack;
 import java.util.Vector;
-import java.util.Map.Entry;
-
 import javax.security.auth.login.LoginException;
 
 import com.google.gson.Gson;
@@ -20,7 +19,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.sun.syndication.feed.synd.SyndEntry;
 import com.sun.syndication.feed.synd.SyndFeed;
-import com.sun.syndication.feed.synd.SyndFeedImpl;
 import com.sun.syndication.io.FeedException;
 import com.sun.syndication.io.SyndFeedInput;
 import com.sun.syndication.io.XmlReader;
@@ -28,15 +26,10 @@ import com.sun.syndication.io.XmlReader;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.MessageChannel;
-import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.EventListener;
-import net.dv8tion.jda.api.utils.MemberCachePolicy;
-import tk.cyriellecentori.CritiBot.BotCommand.Alias;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -57,6 +50,7 @@ public class CritiBot implements EventListener {
 	private JDABuilder builder;
 	private JDA jda;
 	private Gson gson;
+	private Stack<Vector<Ecrit>> cancel = new Stack<Vector<Ecrit>>();
 	private Vector<Ecrit> ecrits;
 	private boolean errorSave = false;
 	private LinkedHashMap<String, BotCommand> commands = new LinkedHashMap<String, BotCommand>();
@@ -159,8 +153,13 @@ public class CritiBot implements EventListener {
 			ecrits = gson.fromJson(data, ttve.getType());
 		}
 		
+		
+		
 		if(ecrits == null)
 			ecrits = new Vector<Ecrit>();
+		
+		for(Ecrit e : ecrits)
+			e.check();
 		
 		initCommands();
 	}
@@ -201,25 +200,27 @@ public class CritiBot implements EventListener {
 						+ "Status doit être « Ouvert — En attente — Abandonné — En pause — Sans nouvelles — Inconnu — Publié — Réservé — Validé — Refusé »..\n"
 						+ "Type doit être « Conte — Rapport — Idée — Autre ».\n"
 						+ "Liste des commandes :\n"
-						+ "c!aide : Cette commande d'aide.\n"
+						+ "`c!aide` : Cette commande d'aide.\n"
+						+ "`c!annuler` : Annule la dernière modification effectuée.\n"
 						+ "__Commandes de gestion et d'affichage de la liste__ :\n"
-						+ "c!ajouter {Nom};{Type};{Status};{URL} : Ajoute manuellement un écrit à la liste.\n"
-						+ "c!nettoyer : Supprime tous les écrits abandonnés de la liste.\n"
-						+ "c!rechercher {Critère} : Affiche tous les écrits contenant {Critère}.\n"
-						+ "c!lister {Status};[Type] : Affiche la liste des écrits avec le status et du type demandés. Status et Type peuvent prendre la valeur « Tout ».\n"
-						+ "c!supprimer {Critère} : Supprime un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit. __**ATTENTION**__ : Il n'y a pas de confirmation, faites attention à ne pas vous tromper dans le Critère.\n"
-						+ "c!inbox : Affiche la boîte de réception, contenant les écrits qui n'ont pas pu être ajoutés automatiquement. Attention, l'appel à cette commande supprime le contenu de la boîte.\n"
+						+ "`c!ajouter {Nom};{Type};{Status};{URL}` : Ajoute manuellement un écrit à la liste.\n"
+						+ "`c!nettoyer` : Supprime tous les écrits abandonnés de la liste.\n"
+						+ "`c!archiver_avant {Date}` : Met le status « sans nouvelles » à tous les écrits n'ayant pas été mis à jour avant la date indiquée. La date doit être au format dd/mm/yyyy.\n"
+						+ "`c!rechercher {Critère}` : Affiche tous les écrits contenant {Critère}.\n"
+						+ "`c!lister {Status};[Type]` : Affiche la liste des écrits avec le status et du type demandés. Status et Type peuvent prendre la valeur « Tout ».\n"
+						+ "`c!supprimer {Critère}` : Supprime un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit. __**ATTENTION**__ : Il n'y a pas de confirmation, faites attention à ne pas vous tromper dans le Critère.\n"
+						+ "`c!inbox` : Affiche la boîte de réception, contenant les écrits qui n'ont pas pu être ajoutés automatiquement. Attention, l'appel à cette commande supprime le contenu de la boîte.\n"
 						+ "__Commandes de modification d'un écrit__ :\n"
-						+ "c!réserver {Critère} : Réserve un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "c!réserver_pour {Critère};{Nom} : Réserve un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
-						+ "c!libérer {Critère} : Supprime la réservation d'un écrit si vous êtes la personne l'ayant réservé, ou membre de l'équipe critique, ou que l'écrit a été réservé par procuration. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "c!status {Critère};{Status} : Change le status de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "c!type {Critère};{Type} : Change le type de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "c!réservation {Critère} : Affiche les informations de réservation d'un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "c!critiqué {Critère} : Alias pour c!libérer et c!status En attente. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "c!valider {Critère} : Change le type du rapport en Rapport si c'était une idée et fait le même effet que c!critiqué. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!réserver {Critère}` : Réserve un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!réserver_pour {Critère};{Nom}` : Réserve un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
+						+ "`c!libérer {Critère}` : Supprime la réservation d'un écrit si vous êtes la personne l'ayant réservé, ou membre de l'équipe critique, ou que l'écrit a été réservé par procuration. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!status {Critère};{Status}` : Change le status de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!type {Critère};{Type}` : Change le type de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!réservation {Critère}` : Affiche les informations de réservation d'un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!critiqué {Critère}` : Alias pour c!libérer et c!status En attente. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!valider {Critère}` : Change le type du rapport en Rapport si c'était une idée et fait le même effet que c!critiqué. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "\n"
-						+ "Version 1.0 — Code source : https://github.com/cyriellecentori/critibot"
+						+ "Version 1.1 — Code source : <https://github.com/cyriellecentori/critibot>"
 						, message.getChannel());
 			}
 		});
@@ -228,6 +229,7 @@ public class CritiBot implements EventListener {
 
 			@Override
 			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				try {
 					ecrits.add(new Ecrit(args[0],  args[3], Type.getType(args[1]), Status.getStatus(args[2])));
 					message.getChannel().sendMessage("Ajouté !").queue();
@@ -286,7 +288,7 @@ public class CritiBot implements EventListener {
 				try {
 					String fullList = "Liste des résultats :\n";
 					for(Ecrit e : bot.search(args[0])) {
-						fullList += e.toString() + "\n";
+						fullList += e.toString() + "\n" + "Dernière mise à jour le " + e.getLastUpdate() + "\n—————\n";
 					}
 					if(fullList.equals("Liste des résultats :\\n")) {
 						fullList = "Aucun écrit trouvé.";
@@ -305,6 +307,7 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				if(e.reserver(message.getAuthor())) {
 					message.getChannel().sendMessage("« " + e.getNom() + " » réservé !").queue();
 				} else {
@@ -321,6 +324,7 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				if(e.liberer(message.getMember())) {
 					message.getChannel().sendMessage("Réservation sur « " + e.getNom() + " » supprimée.").queue();
 				} else {
@@ -333,6 +337,7 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				bot.clean();
 			}
 		});
@@ -341,6 +346,7 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				Status status = Status.getStatus(args[1]);
 				boolean ret = e.setStatus(status);
 				if(!ret) {
@@ -358,6 +364,7 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				Type status = Type.getType(args[1]);
 				e.setType(status);
 				message.getChannel().sendMessage("Type de « " + e.getNom() + " » changé !").queue();
@@ -368,6 +375,7 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				e.promote();
 				message.getChannel().sendMessage("Si l'écrit « " + e.getNom() + " » était une idée, c'est maintenant un rapport ! Sinon, rien n'a changé.").queue();
 				if(e.getStatus() == Status.RESERVE)
@@ -397,6 +405,7 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				bot.remove(e);
 				message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » a été supprimé.").queue();	
 			}
@@ -406,6 +415,7 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				if(e.reserver(args[1])) {
 					message.getChannel().sendMessage("« " + e.getNom() + " » réservé pour " + args[1] + " !").queue();
 				} else {
@@ -419,6 +429,7 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
 				bot.getCommand("libérer").execute(bot, message, new String[] {e.getNom()});
 				if(e.getStatus() != Status.RESERVE)
 					bot.getCommand("status").execute(bot, message, new String[] {e.getNom(), "En attente"});
@@ -442,9 +453,58 @@ public class CritiBot implements EventListener {
 			}
 		});
 		
+		commands.put("archiver_avant", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
+				long date = 0L;
+				try {
+					date = new SimpleDateFormat("dd/MM/yyyy").parse(args[0]).getTime();
+					int n = 0;
+					for(Ecrit e : bot.getEcrits()) {
+						if(e.olderThan(date)) {
+							e.setStatus(Status.SANS_NOUVELLES);
+							n++;
+						}
+					}
+					message.getChannel().sendMessage(n + " écrits ont été marqués sans nouvelles depuis le " + new SimpleDateFormat("dd MMM yyyy").format(new Date(date)) + ".").queue();
+				} catch(ParseException | NullPointerException e) {
+					message.getChannel().sendMessage("Erreur dans le format de la date.").queue();
+				}
+				
+			}
+			
+		});
+		
+		commands.put("annuler", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				if(!bot.annuler()) {
+					message.getChannel().sendMessage("Aucune modification effectuée.").queue();
+				} else {
+					message.getChannel().sendMessage("Dernière modification annulée !").queue();
+				}
+				
+			}
+			
+		});
 		
 		
-		
+	}
+	
+	public boolean annuler() {
+		if(cancel.empty()) {
+			return false;
+		} else {
+			ecrits = cancel.pop();
+			return true;
+		}
+	}
+	
+	public Vector<Ecrit> getEcrits() {
+		return ecrits;
 	}
 	
 	public BotCommand getCommand(String name) {
@@ -459,6 +519,16 @@ public class CritiBot implements EventListener {
 		return inbox;
 	}
 	
+	public void archiver() {
+		cancel.add(new Vector<Ecrit>());
+		for(Ecrit e : ecrits) {
+			cancel.peek().add(e.clone());
+		}
+		if(cancel.size() > 20) {
+			cancel.remove(0);
+		}
+	}
+
 	@Override
 	public void onEvent(GenericEvent event) {
 		if(!(event instanceof MessageReceivedEvent))
@@ -473,7 +543,7 @@ public class CritiBot implements EventListener {
 				e.printStackTrace();
 			}
 		}
-		if(!mre.getMessage().getContentRaw().startsWith("c!"))
+		if(!mre.getMessage().getContentRaw().startsWith("c!") || mre.getAuthor().isBot() || mre.getAuthor().getId().equals(jda.getSelfUser().getId()))
 			return;
 		
 		String command = mre.getMessage().getContentRaw().split(" ", 2)[0].split("!", 2)[1];

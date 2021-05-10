@@ -3,11 +3,13 @@ package tk.cyriellecentori.CritiBot;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import com.google.gson.Gson;
+
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
 
-public class Ecrit {
+public class Ecrit implements Cloneable{
 	public enum Status {
 		OUVERT("Ouvert"),
 		EN_ATTENTE("En attente"),
@@ -91,12 +93,19 @@ public class Ecrit {
 	private long reservation = 0;
 	private String resName = "";
 	private long resDate = 0;
+	private long lastUpdate = 0;
 	
 	Ecrit(String nom, String lien, Type type, Status status) {
 		this.nom = nom;
 		this.lien = lien;
 		this.type = type;
 		this.status = status;
+		lastUpdate = System.currentTimeMillis();
+	}
+	
+	public void check() {
+		if(lastUpdate == 0L)
+			lastUpdate = System.currentTimeMillis();
 	}
 	
 	public String toString() {
@@ -167,6 +176,8 @@ public class Ecrit {
 	}
 	
 	public boolean setStatus(Status status) {
+		if(status != Status.SANS_NOUVELLES)
+			lastUpdate = System.currentTimeMillis();
 		if(this.status == Status.RESERVE)
 			return false;
 		else if(status == Status.RESERVE)
@@ -185,9 +196,20 @@ public class Ecrit {
 	}
 	
 	public String getResDate() {
-		SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy à HH:mm");
-
-	    Date resultdate = new Date(resDate);
-	    return sdf.format(resultdate);
+		return new SimpleDateFormat("dd MMM yyyy à HH:mm").format(new Date(resDate));
+	}
+	
+	public String getLastUpdate() {
+		return new SimpleDateFormat("dd MMM yyyy à HH:mm").format(new Date(lastUpdate));
+	}
+	
+	public boolean olderThan(long time) {
+		return time > lastUpdate;
+	}
+	
+	
+	public Ecrit clone() {
+		return new Gson().fromJson(new Gson().toJson(this), this.getClass());
+		
 	}
 }
