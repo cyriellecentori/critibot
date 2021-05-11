@@ -26,10 +26,15 @@ import com.sun.syndication.io.XmlReader;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.message.guild.react.GuildMessageReactionRemoveEvent;
+import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
+import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEvent;
 import net.dv8tion.jda.api.hooks.EventListener;
+import net.dv8tion.jda.api.requests.restaction.MessageAction;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -54,57 +59,9 @@ public class CritiBot implements EventListener {
 	private Vector<Ecrit> ecrits;
 	private boolean errorSave = false;
 	private LinkedHashMap<String, BotCommand> commands = new LinkedHashMap<String, BotCommand>();
-	private long organichan = 614947463610236939L;
-	
-	public void addNew() throws IllegalArgumentException, MalformedURLException, FeedException, IOException {
-		SyndFeed feed = new SyndFeedInput().build(new XmlReader(new URL("http://fondationscp.wikidot.com/feed/forum/ct-656675.xml")));
-		
-		for(Object e : feed.getEntries()) {
-			SyndEntry entry = (SyndEntry) e;
-			if(entry.getPublishedDate().after(new Date(lastCheck))) {
-				if(entry.getTitle().contains("]")) {
-					Type type = null;
-					String[] sp = entry.getTitle().split("]");
-					String balises = "";
-					for(int i = 0; i < sp.length - 1; i++) {
-						balises += sp[i] + "]";
-					}
-					String unclean = sp[sp.length - 1];
-					if(unclean.contains("SCP") && unclean.contains("FR")) {
-						unclean = unclean.split("FR",2)[1];
-					}
-					while(unclean.startsWith(" ") || unclean.startsWith(":")) {
-						unclean = unclean.substring(1);
-					}
-					if(unclean.startsWith("\"")) {
-						unclean = unclean.substring(1, unclean.length() - 1);
-					}
-					if(unclean.isEmpty() || sp.length == 1) {
-						Vector<Ecrit> es = search("sans nom");
-						unclean = "(sans nom " + es.size() + ")";
-						balises = entry.getTitle();
-					}
-					if(balises.contains("Idée") || balises.contains("idée")) {
-						type = Type.IDEE;
-					} else if(balises.contains("Conte") || balises.contains("Série")) {
-						type = Type.CONTE;
-					} else if(balises.contains("Refus")) {
-						type = Type.AUTRE;
-					} else {
-						type = Type.RAPPORT;
-					}
-					
-					ecrits.add(new Ecrit(unclean, entry.getLink(), type, Status.OUVERT));
-					
-				} else {
-					inbox.add(entry);
-					jda.getPresence().setStatus(OnlineStatus.IDLE);
-				}
-				
-			}
-		}
-		lastCheck = System.currentTimeMillis();
-	}
+	private final long organichan = 614947463610236939L;
+	private final long fluxchan = 710767720433451088L;
+	private final long henritueur = 817064076244418610L;
 	
 	public CritiBot(String token) {
 		this.token = token;
@@ -164,6 +121,58 @@ public class CritiBot implements EventListener {
 		initCommands();
 	}
 	
+	public void addNew(Message botMessage) throws IllegalArgumentException, MalformedURLException, FeedException, IOException {
+		SyndFeed feed = new SyndFeedInput().build(new XmlReader(new URL("http://fondationscp.wikidot.com/feed/forum/ct-656675.xml")));
+		
+		for(Object e : feed.getEntries()) {
+			SyndEntry entry = (SyndEntry) e;
+			if(entry.getPublishedDate().after(new Date(lastCheck))) {
+				if(entry.getTitle().contains("]")) {
+					Type type = null;
+					String[] sp = entry.getTitle().split("]");
+					String balises = "";
+					for(int i = 0; i < sp.length - 1; i++) {
+						balises += sp[i] + "]";
+					}
+					String unclean = sp[sp.length - 1];
+					if(unclean.contains("SCP") && unclean.contains("FR")) {
+						unclean = unclean.split("FR",2)[1];
+					}
+					while(unclean.startsWith(" ") || unclean.startsWith(":")) {
+						unclean = unclean.substring(1);
+					}
+					if(unclean.startsWith("\"")) {
+						unclean = unclean.substring(1, unclean.length() - 1);
+					}
+					if(unclean.isEmpty() || sp.length == 1) {
+						Vector<Ecrit> es = search("sans nom");
+						unclean = "(sans nom " + es.size() + ")";
+						balises = entry.getTitle();
+					}
+					if(balises.contains("Idée") || balises.contains("idée")) {
+						type = Type.IDEE;
+					} else if(balises.contains("Conte") || balises.contains("Série")) {
+						type = Type.CONTE;
+					} else if(balises.contains("Refus")) {
+						type = Type.AUTRE;
+					} else {
+						type = Type.RAPPORT;
+					}
+					Ecrit ecrit = new Ecrit(unclean, entry.getLink(), type, Status.OUVERT);
+					ecrit.setBotMessage(botMessage.getIdLong());
+					botMessage.addReaction(botMessage.getGuild().getEmoteById(henritueur)).queue();
+					ecrits.add(ecrit);
+					
+				} else {
+					inbox.add(entry);
+					jda.getPresence().setStatus(OnlineStatus.IDLE);
+				}
+				
+			}
+		}
+		lastCheck = System.currentTimeMillis();
+	}
+	
 	public void save() throws IOException {
 		BufferedWriter dataFile = new BufferedWriter(new FileWriter("critibot.json"));
 		dataFile.write(gson.toJson(ecrits) + "θ" + lastCheck);
@@ -220,7 +229,7 @@ public class CritiBot implements EventListener {
 						+ "`c!critiqué {Critère}` : Alias pour c!libérer et c!status En attente. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!valider {Critère}` : Change le type du rapport en Rapport si c'était une idée et fait le même effet que c!critiqué. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "\n"
-						+ "Version 1.1 — Code source : <https://github.com/cyriellecentori/critibot>"
+						+ "Version 1.2 — Code source : <https://github.com/cyriellecentori/critibot>"
 						, message.getChannel());
 			}
 		});
@@ -307,11 +316,12 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				message.getMessage().delete().queue();
 				archiver();
 				if(e.reserver(message.getAuthor())) {
-					message.getChannel().sendMessage("« " + e.getNom() + " » réservé !").queue();
+					message.getChannel().sendMessage("« " + e.getNom() + " » réservé par " + message.getAuthor().getName() + " !").queue();
 				} else {
-					message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être réservé. Il l'est peut-être déjà, ou n'a pas un status réservable. Les écrits pouvant être réservés sont les écrits Ouverts, Abandonnés, En Pause, Validés, Sans Nouvelles ou au status inconnu. Vous pouvez également tenter de libérer l'écrit si vous faites partie de l'Équipe Critique ou que l'écrit est réservé depuis plus de trois jours.").queue();
+					message.getAuthor().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être réservé. Il l'est peut-être déjà, ou n'a pas un status réservable. Les écrits pouvant être réservés sont les écrits Ouverts, Abandonnés, En Pause, Validés, Sans Nouvelles ou au status inconnu. Vous pouvez également tenter de libérer l'écrit si vous faites partie de l'Équipe Critique ou que l'écrit est réservé depuis plus de trois jours.").queue();
 				}
 			}
 		});
@@ -324,11 +334,16 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				message.getMessage().delete().queue();
 				archiver();
+				if(e.getStatus() != Status.RESERVE) {
+					message.getChannel().sendMessage("« " + e.getNom() + " » n'est pas réservé.").queue();
+					return;
+				}
 				if(e.liberer(message.getMember())) {
 					message.getChannel().sendMessage("Réservation sur « " + e.getNom() + " » supprimée.").queue();
 				} else {
-					message.getChannel().sendMessage("Vous n'êtes pas à l'origine de la réservation sur « " + e.getNom() + " » ou vous n'êtes pas de l'équipe critique.").queue();
+					message.getAuthor().openPrivateChannel().complete().sendMessage("Vous n'êtes pas à l'origine de la réservation sur « " + e.getNom() + " » ou vous n'êtes pas de l'équipe critique.").queue();
 				}
 			}
 		});
@@ -339,6 +354,7 @@ public class CritiBot implements EventListener {
 			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
 				archiver();
 				bot.clean();
+				message.getChannel().sendMessage("Écrits abandonnés et refusés supprimés de la liste !").queue();
 			}
 		});
 		
@@ -375,12 +391,13 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				message.getMessage().delete().queue();
 				archiver();
 				e.promote();
 				message.getChannel().sendMessage("Si l'écrit « " + e.getNom() + " » était une idée, c'est maintenant un rapport ! Sinon, rien n'a changé.").queue();
 				if(e.getStatus() == Status.RESERVE)
 					if(!e.liberer(message.getMember()))
-						message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » a déjà été réservé par quelqu'un d'autre. Je vais cependant vous croire sur le fait que vous avez critiqué l'écrit, mais vous avez probablement enfreint une réservation et c'est pas très gentil.").queue();
+						message.getAuthor().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » a déjà été réservé par quelqu'un d'autre. Je vais cependant vous croire sur le fait que vous avez critiqué l'écrit, mais vous avez probablement enfreint une réservation et c'est pas très gentil.").queue();
 				e.setStatus(Status.EN_ATTENTE);
 				message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » a été noté comme critiqué !").queue();
 				
@@ -415,11 +432,12 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				message.getMessage().delete().queue();
 				archiver();
 				if(e.reserver(args[1])) {
 					message.getChannel().sendMessage("« " + e.getNom() + " » réservé pour " + args[1] + " !").queue();
 				} else {
-					message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être réservé. Il l'est peut-être déjà, ou n'a pas un status réservable. Les écrits pouvant être réservés sont les écrits Ouverts, Abandonnés, En Pause, Validés, Sans Nouvelles ou au status inconnu. Vous pouvez également tenter de libérer l'écrit si vous faites partie de l'Équipe Critique ou que l'écrit est réservé depuis plus de trois jours.").queue();
+					message.getAuthor().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être réservé. Il l'est peut-être déjà, ou n'a pas un status réservable. Les écrits pouvant être réservés sont les écrits Ouverts, Abandonnés, En Pause, Validés, Sans Nouvelles ou au status inconnu. Vous pouvez également tenter de libérer l'écrit si vous faites partie de l'Équipe Critique ou que l'écrit est réservé depuis plus de trois jours.").queue();
 				}
 				
 			}
@@ -429,10 +447,12 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				message.getMessage().delete().queue();
 				archiver();
-				bot.getCommand("libérer").execute(bot, message, new String[] {e.getNom()});
-				if(e.getStatus() != Status.RESERVE)
-					bot.getCommand("status").execute(bot, message, new String[] {e.getNom(), "En attente"});
+				message.getChannel().sendMessage("« " + e.getNom() + " » critiqué !").queue();
+				if(!e.critique(message.getMember())) {
+					message.getAuthor().openPrivateChannel().complete().sendMessage("Vous avez indiqué avoir critiqué « " + e.getNom() + " » mais vous n'étiez pas à l'origine de la réservation. Je vous fais confiance, mais sachez que c'est pas cool.").queue();
+				}
 			}
 		});
 		
@@ -531,13 +551,59 @@ public class CritiBot implements EventListener {
 
 	@Override
 	public void onEvent(GenericEvent event) {
+		if(event instanceof MessageReactionAddEvent) {
+			MessageReactionAddEvent mrae = (MessageReactionAddEvent) event;
+			if(mrae.getReactionEmote().getEmote().getIdLong() == henritueur && mrae.getReaction().getChannel().getIdLong() == fluxchan && !mrae.getUser().isBot()) {
+				for(Ecrit e : ecrits) {
+					if(e.getBotMessage() == mrae.getReaction().getMessageIdLong()) {
+						if(e.getStatus() == Status.RESERVE) {
+							mrae.getUser().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » est déjà réservé !").queue();
+						} else {
+							if(e.reserver(mrae.getUser())) {
+								archiver();
+								e.setAutoResMessage(jda.getTextChannelById(organichan).sendMessage("« " + e.getNom() + " » réservé par " + mrae.getUser().getAsMention() + " !").complete().getIdLong());
+							} else {
+								mrae.getUser().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être réservé. Il l'est peut-être déjà, ou n'a pas un status réservable. Les écrits pouvant être réservés sont les écrits Ouverts, Abandonnés, En Pause, Validés, Sans Nouvelles ou au status inconnu. Vous pouvez également tenter de libérer l'écrit si vous faites partie de l'Équipe Critique ou que l'écrit est réservé depuis plus de trois jours.").queue();
+							}
+						}
+						
+					}
+				}
+			}
+		} else if(event instanceof GuildMessageReactionRemoveEvent) {
+			GuildMessageReactionRemoveEvent mrre = (GuildMessageReactionRemoveEvent) event;
+			if(mrre.getReactionEmote().getEmote().getIdLong() == henritueur && mrre.getReaction().getChannel().getIdLong() == fluxchan) {
+				System.out.println(mrre.getUserIdLong());
+				System.out.println(mrre.getReaction().getMessageIdLong());
+				System.out.println("——————————— ->");
+				for(Ecrit e : ecrits) {
+					System.out.println(e.getNom());
+					System.out.println(e.getResId());
+					System.out.println(e.getBotMessage());
+					System.out.println(e.getAutoResMessage());
+					System.out.println("———————————————");
+					if(e.getBotMessage() == mrre.getReaction().getMessageIdLong() && /*e.getAutoResMessage() != 0L &&*/ e.getResId() == mrre.getUserIdLong()) {
+						archiver();
+						e.liberer(null);
+						jda.getTextChannelById(organichan).sendMessage("Réservation sur « " + e.getNom() + " » supprimée.").queue();
+						/* jda.getGuildById(547458908361588771L)
+						.getTextChannelById(organichan)
+						.retrieveMessageById(e.getAutoResMessage())
+						.complete().
+						delete().queue(); */
+						e.removeAutoResMessage();
+							//mrre.getUser().openPrivateChannel().complete().sendMessage("Vous avez libéré la réservation sur l'écrit « " + e.getNom() + " ». N'oubliez pas de supprimer mon message dans #organisation.").queue();
+					}
+				}
+			}
+		}
 		if(!(event instanceof MessageReceivedEvent))
 			return;
 		
 		MessageReceivedEvent mre = (MessageReceivedEvent) event;
 		if(mre.getAuthor().getIdLong() == 268478587651358721L) {
 			try {
-				addNew();
+				addNew(mre.getMessage());
 			} catch (IllegalArgumentException | FeedException | IOException e) {
 				jda.getPresence().setStatus(OnlineStatus.DO_NOT_DISTURB);
 				e.printStackTrace();

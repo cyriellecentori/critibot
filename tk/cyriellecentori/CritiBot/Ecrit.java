@@ -94,6 +94,8 @@ public class Ecrit implements Cloneable{
 	private String resName = "";
 	private long resDate = 0;
 	private long lastUpdate = 0;
+	private long botMessage = 0;
+	private long autoResMessage = 0;
 	
 	Ecrit(String nom, String lien, Type type, Status status) {
 		this.nom = nom;
@@ -101,6 +103,14 @@ public class Ecrit implements Cloneable{
 		this.type = type;
 		this.status = status;
 		lastUpdate = System.currentTimeMillis();
+	}
+	
+	public void setBotMessage(long botMessage) {
+		this.botMessage = botMessage;
+	}
+	
+	public long getBotMessage() {
+		return botMessage;
 	}
 	
 	public void check() {
@@ -136,18 +146,30 @@ public class Ecrit implements Cloneable{
 	
 	public boolean liberer(Member member) {
 		if(status != Status.RESERVE)
-			return false;
-		if(reservation == 0L) {
-			resName = "";
-			status = old;
 			return true;
-		} else if(member.getUser().getIdLong() == reservation || member.getRoles().contains(member.getGuild().getRoleById(612383955253067963L)) || resDate > 3*24*3600*1000) {
+		try {
+			if(reservation == 0L) {
+				removeAutoResMessage();
+				resName = "";
+				status = old;
+				return true;
+			} else if(member.getUser().getIdLong() == reservation 
+					|| member.getRoles().contains
+					(member.getGuild().getRoleById(612383955253067963L)) || resDate > 3*24*3600*1000) {
+				removeAutoResMessage();
+				reservation = 0;
+				resName = "";
+				status = old;
+				return true;
+			} else
+				return false;
+		} catch(NullPointerException e) { // En gros le null ça veut dire tkt fais-moi confiance bro
 			reservation = 0;
+			removeAutoResMessage();
 			resName = "";
 			status = old;
 			return true;
-		} else
-			return false;
+		}
 	}
 	
 	public String getReservation(Guild guild) {
@@ -211,5 +233,36 @@ public class Ecrit implements Cloneable{
 	public Ecrit clone() {
 		return new Gson().fromJson(new Gson().toJson(this), this.getClass());
 		
+	}
+	
+	public boolean critique(Member u) {
+		lastUpdate = System.currentTimeMillis();
+		boolean b = liberer(u);
+		if(!b) {
+			resName = "";
+			reservation = 0;
+		}
+		status = Status.EN_ATTENTE;
+		return b;
+	}
+	
+	public long getResId() {
+		return reservation;
+	}
+	
+	public long getAutoResMessage() {
+		return autoResMessage;
+	}
+	
+	public boolean setAutoResMessage(long message) {
+		if(this.autoResMessage != 0L) {
+			return false;
+		}
+		this.autoResMessage = message;
+		return true;
+	}
+	
+	public void removeAutoResMessage() {
+		autoResMessage = 0L;
 	}
 }
