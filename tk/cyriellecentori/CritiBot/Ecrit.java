@@ -1,12 +1,17 @@
 package tk.cyriellecentori.CritiBot;
 
+import java.awt.Color;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.temporal.TemporalAccessor;
 import java.util.Date;
 
 import com.google.gson.Gson;
 
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.User;
 
 public class Ecrit implements Cloneable{
@@ -20,7 +25,8 @@ public class Ecrit implements Cloneable{
 		PUBLIE("Publié"),
 		RESERVE("Réservé"),
 		VALIDE("Validé"),
-		REFUSE("Refusé");
+		REFUSE("Refusé"),
+		INFRACTION("Infraction");
 		String nom;
 		Status(String nom) {
 			this.nom = nom;
@@ -51,6 +57,8 @@ public class Ecrit implements Cloneable{
 				return REFUSE;
 			} else if(str.equalsIgnoreCase(ABANDONNE.nom)) {
 				return ABANDONNE;
+			} else if(str.equalsIgnoreCase(INFRACTION.nom)) {
+				return INFRACTION;
 			} else {
 				return INCONNU;
 			}
@@ -264,5 +272,43 @@ public class Ecrit implements Cloneable{
 	
 	public void removeAutoResMessage() {
 		autoResMessage = 0L;
+	}
+	
+	public String getLien() {
+		return lien;
+	}
+	
+	public MessageEmbed toEmbed() {
+		EmbedBuilder embed = new EmbedBuilder();
+		embed.setTitle(nom, lien);
+		embed.addField("Type", type.toString(), false);
+		if(status == Status.RESERVE) {
+			embed.addField("Status", status.toString() + " par " + resName, false);
+		} else
+			embed.addField("Status", status.toString(), false);
+		embed.setFooter("Dernière modification");
+		embed.setTimestamp(Instant.ofEpochMilli(lastUpdate));
+		switch(type) {
+		case AUTRE:
+			embed.setColor(Color.WHITE);
+			break;
+		case CONTE:
+			embed.setColor(0x008000);
+			break;
+		case IDEE:
+			embed.setColor(0xDF7401);
+			break;
+		case RAPPORT:
+			embed.setColor(0x01A9DB);
+			break;
+		default:
+			break;
+		
+		}
+		return embed.build();
+	}
+	
+	public Type getType() {
+		return type;
 	}
 }

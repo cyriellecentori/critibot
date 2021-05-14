@@ -1,4 +1,5 @@
 package tk.cyriellecentori.CritiBot;
+import java.awt.Color;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
@@ -8,6 +9,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Stack;
@@ -23,11 +25,13 @@ import com.sun.syndication.io.FeedException;
 import com.sun.syndication.io.SyndFeedInput;
 import com.sun.syndication.io.XmlReader;
 
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageChannel;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.guild.react.GuildMessageReactionRemoveEvent;
@@ -199,25 +203,19 @@ public class CritiBot implements EventListener {
 		Vector<Ecrit> list = new Vector<Ecrit>();
 		String[] motsSearch = basicize(s).split(" ");
 		for(Ecrit e : ecrits) {
-			System.out.println("Écrit : " + basicize(e.getNom()));
 			String[] mots = basicize(e.getNom()).split(" ");
 			boolean ok = true;
 			for(String motSearch : motsSearch) {
-				System.out.println("Mot de recherche : " + motSearch);
 				boolean found = false;
 				for(String mot : mots) {
-					System.out.println("Mot de l'écrit : " + mot);
 					if(mot.toLowerCase().contains(motSearch.toLowerCase())) {
 						found = true;
-						System.out.println("Yay!");
 					}
 				}
 				if(!found) {
-					System.out.println(";-;");
 					ok = false;
 					break;
 				}
-				System.out.println("————————————————");
 			}
 			if(ok) {
 				list.add(e);
@@ -227,9 +225,13 @@ public class CritiBot implements EventListener {
 	}
 	
 	public void clean() {
+		Vector<Ecrit> toRem = new Vector<Ecrit>();
 		for(Ecrit e : ecrits) {
 			if(e.isDead())
-				ecrits.removeElement(e);
+				toRem.add(e);
+		}
+		for(Ecrit e : toRem) {
+			ecrits.remove(e);
 		}
 	}
 	
@@ -240,7 +242,33 @@ public class CritiBot implements EventListener {
 	private void initCommands() {
 		commands.put("aide", new BotCommand() {
 			public void execute(CritiBot bb, MessageReceivedEvent message, String[] args) {
-				BotCommand.sendLongMessage(""
+				EmbedBuilder b = new EmbedBuilder();
+				b.setTitle("Aide de Critibot");
+				b.setDescription("Les paramètres entre crochets sont optionnels, entre accolades obligatoires.");
+				b.addField("Valeurs de Status", "Status doit être « Ouvert — En attente — Abandonné — En pause — Sans nouvelles — Inconnu — Publié — Réservé — Validé — Refusé »", false);
+				b.addField("Valeurs de Type", "Type doit être « Conte — Rapport — Idée — Autre »", false);
+				b.addField("Commandes de base", "`c!aide` : Cette commande d'aide.\n"
+						+ "`c!annuler` : Annule la dernière modification effectuée.", false);
+				b.addField("Commandes de gestion et d'affichage de la liste", "`c!ajouter {Nom};{Type};{Status};{URL}` : Ajoute manuellement un écrit à la liste.\n"
+						+ "`c!nettoyer` : Supprime tous les écrits abandonnés de la liste.\n"
+						+ "`c!archiver_avant {Date}` : Met le status « sans nouvelles » à tous les écrits n'ayant pas été mis à jour avant la date indiquée. La date doit être au format dd/mm/yyyy.\n"
+						+ "`c!rechercher {Critère}` : Affiche tous les écrits contenant {Critère}.\n"
+						+ "`c!lister {Status};[Type]` : Affiche la liste des écrits avec le status et du type demandés. Status et Type peuvent prendre la valeur « Tout ».\n"
+						+ "`c!supprimer {Critère}` : Supprime un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit. __**ATTENTION**__ : Il n'y a pas de confirmation, faites attention à ne pas vous tromper dans le Critère.\n"
+						+ "`c!inbox` : Affiche la boîte de réception, contenant les écrits qui n'ont pas pu être ajoutés automatiquement. Attention, l'appel à cette commande supprime le contenu de la boîte.", false);
+				b.addField("Commandes de critiques", "`c!réserver {Critère}` : Réserve un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!réserver_pour {Critère};{Nom}` : Réserve un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
+						+ "`c!libérer {Critère}` : Supprime la réservation d'un écrit si vous êtes la personne l'ayant réservé, ou membre de l'équipe critique, ou que l'écrit a été réservé par procuration. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!réservation {Critère}` : Affiche les informations de réservation d'un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!critiqué {Critère}` : Alias pour c!libérer et c!status En attente. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!valider {Critère}` : Change le type du rapport en Rapport si c'était une idée et fait le même effet que c!critiqué. Le Critère doit être assez fin pour aboutir à un unique écrit.", false);
+				b.addField("Commandes de modification d'un écrit",  "`c!status {Critère};{Status}` : Change le status de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!type {Critère};{Type}` : Change le type de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.", false);
+				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
+				b.setFooter("Version 1.3");
+				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
+				
+				/*BotCommand.sendLongMessage(""
 						+ "Les paramètres entre crochets sont optionnels, entre accolades obligatoires.\n"
 						+ "Possibilités pour les paramètres Status et Type :\n"
 						+ "Status doit être « Ouvert — En attente — Abandonné — En pause — Sans nouvelles — Inconnu — Publié — Réservé — Validé — Refusé »..\n"
@@ -266,8 +294,9 @@ public class CritiBot implements EventListener {
 						+ "`c!critiqué {Critère}` : Alias pour c!libérer et c!status En attente. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!valider {Critère}` : Change le type du rapport en Rapport si c'était une idée et fait le même effet que c!critiqué. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "\n"
-						+ "Version 1.2 — Code source : <https://github.com/cyriellecentori/critibot>"
-						, message.getChannel());
+						+ "Version 1.3 — Code source : <https://github.com/cyriellecentori/critibot>"
+						, message.getChannel());*/
+				message.getChannel().sendMessage(b.build()).queue();
 			}
 		});
 		
@@ -298,14 +327,45 @@ public class CritiBot implements EventListener {
 					if(args.length > 1)
 						type = (args[1].equalsIgnoreCase("tout") ? null : Type.getType(args[1]));
 					
-					String fullList = "Liste demandée :\n";
+					
+					Vector<MessageEmbed> embeds = new Vector<MessageEmbed>();
+					Vector<String> messages = new Vector<String>();
+					String buffer = "";
 					for(Ecrit e : ecrits) {
-						if(e.complyWith(type, status))
-							fullList += e.toString() + "\n";
+						if(e.complyWith(type, status)) {
+							String toAdd = "[**" + e.getNom() + "**](" + e.getLien() + ")\n" + e.getStatus() + " — " + e.getType() + "\n\n";
+							if(buffer.length() + toAdd.length() > 2000) {
+								messages.add(buffer);
+								buffer = "";
+							}
+							buffer += toAdd;
+						}
+							
 					}
-					if(fullList.equals("Liste demandée :\\n"))
-						fullList = "Aucun écrit ne correspond à votre recherche.";
-					sendLongMessage(fullList, message.getChannel());
+					if(buffer.isEmpty()) {
+						EmbedBuilder b = new EmbedBuilder();
+						b.setTitle("Aucun résultat");
+						b.setAuthor("Recherche : " + ((status == null) ? "Tous status" : status) + " — " + ((type == null) ? "Tous types" : type));
+						b.setTimestamp(Instant.now());
+						b.setColor(16001600);
+						message.getChannel().sendMessage(b.build()).queue();
+					} else {
+						messages.add(buffer);
+						EmbedBuilder b = new EmbedBuilder();
+						b.setTitle("Résultats de la recherche");
+						b.setAuthor("Recherche : " + ((status == null) ? "Tous status" : status) + " — " + ((type == null) ? "Tous types" : type));
+						b.setTimestamp(Instant.now());
+						b.setColor(73887);
+						for(int i = 0; i < messages.size(); i++) {
+							b.setFooter("Page " + (i + 1) + "/" + messages.size());
+							b.setDescription(messages.get(i));
+							embeds.add(b.build());
+						}
+						
+						for(MessageEmbed embed : embeds) {
+							message.getChannel().sendMessage(embed).queue();
+						}
+					}
 					
 				} catch(ArrayIndexOutOfBoundsException e) {
 					message.getChannel().sendMessage("Utilisation : c!list Status;Type. Il est possible de ne pas spécifier le type si non nécessaire, alors la commande sera c!list Status et tous les types seront affichés.\n"
@@ -332,19 +392,51 @@ public class CritiBot implements EventListener {
 			@Override
 			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
 				try {
-					String fullList = "Liste des résultats :\n";
-					for(Ecrit e : bot.search(args[0])) {
-						fullList += e.toString() + "\n" + "Dernière mise à jour le " + e.getLastUpdate() + "\n—————\n";
+					Vector<Ecrit> res = bot.search(args[0]);
+					if(res.isEmpty()) {
+						EmbedBuilder b = new EmbedBuilder();
+						b.setTitle("Aucun résultat");
+						b.setAuthor("Recherche : " + args[0]);
+						b.setTimestamp(Instant.now());
+						b.setColor(16001600);
+						message.getChannel().sendMessage(b.build()).queue();
+					} else if(res.size() <= 3) {
+						for(Ecrit e : res) {
+							message.getChannel().sendMessage(e.toEmbed()).queue();
+						}
+					} else {
+						Vector<MessageEmbed> embeds = new Vector<MessageEmbed>();
+						Vector<String> messages = new Vector<String>();
+						String buffer = "";
+						for(Ecrit e : res) {
+							String toAdd = "[**" + e.getNom() + "**](" + e.getLien() + ")\n" + e.getStatus() + " — " + e.getType() + "\n\n";
+							if(buffer.length() + toAdd.length() > 2000) {
+								messages.add(buffer);
+								buffer = "";
+							}
+							buffer += toAdd;
+						}
+						messages.add(buffer);
+						EmbedBuilder b = new EmbedBuilder();
+						b.setTitle("Résultats de la recherche");
+						b.setAuthor("Recherche : " + args[0]);
+						b.setTimestamp(Instant.now());
+						b.setColor(73887);
+						for(int i = 0; i < messages.size(); i++) {
+							b.setFooter("Page " + (i + 1) + "/" + messages.size());
+							b.setDescription(messages.get(i));
+							embeds.add(b.build());
+
+							for(MessageEmbed embed : embeds) {
+								message.getChannel().sendMessage(embed).queue();
+							}
+						}
 					}
-					if(fullList.equals("Liste des résultats :\\n")) {
-						fullList = "Aucun écrit trouvé.";
-					}
-					sendLongMessage(fullList, message.getChannel());
 				} catch(ArrayIndexOutOfBoundsException e) {
 					message.getChannel().sendMessage("Rechercher… Quoi exactement ?").queue();
 				}
 			}
-			
+
 		});
 		
 		commands.put("s", new BotCommand.Alias(commands.get("rechercher")));
