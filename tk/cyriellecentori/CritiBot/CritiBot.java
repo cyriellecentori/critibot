@@ -179,10 +179,47 @@ public class CritiBot implements EventListener {
 		dataFile.close();
 	}
 	
+	private String basicize(String s) {
+		return s.toLowerCase()
+				.replaceAll("é", "e")
+				.replaceAll("ê", "e")
+				.replaceAll("à", "a")
+				.replaceAll("ï", "i")
+				.replaceAll("ç", "c")
+				.replaceAll("ë", "e")
+				.replaceAll("ô", "o")
+				.replaceAll("è", "e")
+				.replaceAll("î", "i")
+				.replaceAll("œ", "oe")
+				.replaceAll("æ", "ae");
+		
+	}
+	
 	public Vector<Ecrit> search(String s) {
 		Vector<Ecrit> list = new Vector<Ecrit>();
+		String[] motsSearch = basicize(s).split(" ");
 		for(Ecrit e : ecrits) {
-			if(e.getNom().toLowerCase().contains(s.toLowerCase())) {
+			System.out.println("Écrit : " + basicize(e.getNom()));
+			String[] mots = basicize(e.getNom()).split(" ");
+			boolean ok = true;
+			for(String motSearch : motsSearch) {
+				System.out.println("Mot de recherche : " + motSearch);
+				boolean found = false;
+				for(String mot : mots) {
+					System.out.println("Mot de l'écrit : " + mot);
+					if(mot.toLowerCase().contains(motSearch.toLowerCase())) {
+						found = true;
+						System.out.println("Yay!");
+					}
+				}
+				if(!found) {
+					System.out.println(";-;");
+					ok = false;
+					break;
+				}
+				System.out.println("————————————————");
+			}
+			if(ok) {
 				list.add(e);
 			}
 		}
@@ -505,6 +542,21 @@ public class CritiBot implements EventListener {
 					message.getChannel().sendMessage("Aucune modification effectuée.").queue();
 				} else {
 					message.getChannel().sendMessage("Dernière modification annulée !").queue();
+				}
+				
+			}
+			
+		});
+		
+		commands.put("maj", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				try {
+					bot.addNew(message.getMessage());
+				} catch (IllegalArgumentException | FeedException | IOException e) {
+					message.getChannel().sendMessage("Ça a pas marché.").queue();
+					e.printStackTrace();
 				}
 				
 			}
