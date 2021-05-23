@@ -9,8 +9,10 @@ import java.util.Date;
 import com.google.gson.Gson;
 
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.User;
 
@@ -102,8 +104,8 @@ public class Ecrit implements Cloneable{
 	private String resName = "";
 	private long resDate = 0;
 	private long lastUpdate = 0;
-	private long botMessage = 0;
-	private long autoResMessage = 0;
+	
+	private BotMessage statusMessage = new BotMessage();
 	
 	Ecrit(String nom, String lien, Type type, Status status) {
 		this.nom = nom;
@@ -113,30 +115,48 @@ public class Ecrit implements Cloneable{
 		lastUpdate = System.currentTimeMillis();
 	}
 	
-	public void setBotMessage(long botMessage) {
-		this.botMessage = botMessage;
+	public boolean setStatusMessage(Message message) {
+		boolean change = true;
+		if(statusMessage.isInitialized()) {
+			change = false;
+		}
+		if(change) {
+			this.statusMessage = new BotMessage(message);
+		}
+		return change;
 	}
 	
-	public long getBotMessage() {
-		return botMessage;
+	public void removeStatusMessage() {
+		statusMessage.getMessage().delete().complete();
+		statusMessage = new BotMessage();
 	}
 	
-	public void check() {
+	public BotMessage getStatusMessage() {
+		return statusMessage;
+	}
+	
+	public void check(JDA jda) {
 		if(lastUpdate == 0L)
 			lastUpdate = System.currentTimeMillis();
+		if(statusMessage != null) {
+			if(!statusMessage.isInitialized())
+				statusMessage.retrieve(jda);
+		} else {
+			statusMessage = new BotMessage();
+		}
 	}
 	
 	public String toString() {
 		return nom + " — " + type + " — " + status + " — " + lien;
 	}
 	
-	public boolean reserver(User user) {
+	public boolean reserver(Member member) {
 		if(!(status == Status.OUVERT || status == Status.ABANDONNE || status == Status.EN_PAUSE || status == Status.INCONNU || status == Status.VALIDE || status == Status.SANS_NOUVELLES))
 			return false;
 		resDate = System.currentTimeMillis();
-		reservation = user.getIdLong();
+		reservation = member.getIdLong();
 		old = status;
-		resName = user.getName();
+		resName = member.getEffectiveName();
 		status = Status.RESERVE;
 		return true;
 	}
@@ -157,14 +177,12 @@ public class Ecrit implements Cloneable{
 			return true;
 		try {
 			if(reservation == 0L) {
-				removeAutoResMessage();
 				resName = "";
 				status = old;
 				return true;
 			} else if(member.getUser().getIdLong() == reservation 
 					|| member.getRoles().contains
 					(member.getGuild().getRoleById(612383955253067963L)) || resDate > 3*24*3600*1000) {
-				removeAutoResMessage();
 				reservation = 0;
 				resName = "";
 				status = old;
@@ -173,7 +191,6 @@ public class Ecrit implements Cloneable{
 				return false;
 		} catch(NullPointerException e) { // En gros le null ça veut dire tkt fais-moi confiance bro
 			reservation = 0;
-			removeAutoResMessage();
 			resName = "";
 			status = old;
 			return true;
@@ -220,6 +237,10 @@ public class Ecrit implements Cloneable{
 		this.type = type;
 	}
 	
+	public void rename(String newName) {
+		this.nom = newName;
+	}
+	
 	public void promote() {
 		if(type == Type.IDEE)
 			type = Type.RAPPORT;
@@ -256,22 +277,6 @@ public class Ecrit implements Cloneable{
 	
 	public long getResId() {
 		return reservation;
-	}
-	
-	public long getAutoResMessage() {
-		return autoResMessage;
-	}
-	
-	public boolean setAutoResMessage(long message) {
-		if(this.autoResMessage != 0L) {
-			return false;
-		}
-		this.autoResMessage = message;
-		return true;
-	}
-	
-	public void removeAutoResMessage() {
-		autoResMessage = 0L;
 	}
 	
 	public String getLien() {
