@@ -230,11 +230,15 @@ public class Ecrit implements Cloneable{
 		else if(status == Status.RESERVE)
 			return false;
 		this.status = status;
+		if(this.statusMessage.isInitialized())
+			this.statusMessage.getMessage().editMessage(this.toEmbed()).queue();
 		return true;
 	}
 	
 	public void setType(Type type) {
 		this.type = type;
+		if(this.statusMessage.isInitialized())
+			this.statusMessage.getMessage().editMessage(this.toEmbed()).queue();
 	}
 	
 	public void rename(String newName) {

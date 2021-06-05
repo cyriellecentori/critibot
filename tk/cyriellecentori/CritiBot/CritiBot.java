@@ -32,6 +32,7 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.entities.MessageEmbed;
@@ -263,10 +264,10 @@ public class CritiBot implements EventListener {
 		return list;
 	}
 	
-	public void clean() {
+	public void clean(boolean fort) {
 		Vector<Ecrit> toRem = new Vector<Ecrit>();
 		for(Ecrit e : ecrits) {
-			if(e.isDead())
+			if(e.isDead() || (fort && e.getStatus() == Status.SANS_NOUVELLES))
 				toRem.add(e);
 		}
 		for(Ecrit e : toRem) {
@@ -324,8 +325,6 @@ public class CritiBot implements EventListener {
 				b.addField("Commandes de base", "`c!aide` : Cette commande d'aide.\n"
 						+ "`c!annuler` : Annule la dernière modification effectuée.", false);
 				b.addField("Commandes de gestion et d'affichage de la liste", "`c!ajouter {Nom};{Type};{Statut};{URL}` : Ajoute manuellement un écrit à la liste.\n"
-						+ "`c!nettoyer` : Supprime tous les écrits abandonnés de la liste.\n"
-						+ "`c!archiver_avant {Date}` : Met le statut « sans nouvelles » à tous les écrits n'ayant pas été mis à jour avant la date indiquée. La date doit être au format dd/mm/yyyy.\n"
 						+ "`c!rechercher {Critère}` : Affiche tous les écrits contenant {Critère}.\n"
 						+ "`c!lister {Statut};[Type]` : Affiche la liste des écrits avec le statut et du type demandés. Statut et Type peuvent prendre la valeur « Tout ».\n"
 						+ "`c!supprimer {Critère}` : Supprime un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit. __**ATTENTION**__ : Il n'y a pas de confirmation, faites attention à ne pas vous tromper dans le Critère.\n"
@@ -340,8 +339,13 @@ public class CritiBot implements EventListener {
 						+ "`c!type {Critère};{Type}` : Change le type de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!ouvrir {Critère}` : Raccourci pour `c!statut {Critère};Ouvert`.\n"
 						+ "`c!renommer {Critère};{Nouveau nom}` : Renomme un écrit.", false);
+				b.addField("Commandes d'entretien de la base de données (À utiliser avec précaution)",
+						"`c!nettoyer` : Supprime tous les écrits abandonnés / refusés / publiés de la liste.\n"
+						+ "`c!archiver_avant {Date}` : Met le statut « sans nouvelles » à tous les écrits n'ayant pas été mis à jour avant la date indiquée. La date doit être au format dd/mm/yyyy.\n"
+						+ "`c!nettoyer_fort` : Supprime tous les écrits abandonnés / refusés / publiés / sans nouvelles de la liste.\n"
+						+ "`c!doublons` : Supprime les éventuels doublons.", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 1.3");
+				b.setFooter("Version 1.4");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message.getChannel().sendMessage(b.build()).queue();
 			}
@@ -525,8 +529,8 @@ public class CritiBot implements EventListener {
 			@Override
 			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
 				archiver();
-				bot.clean();
-				message.getChannel().sendMessage("Écrits abandonnés et refusés supprimés de la liste !").queue();
+				bot.clean(false);
+				message.getChannel().sendMessage("Écrits abandonnés, publiés et refusés supprimés de la liste !").queue();
 			}
 		});
 		
@@ -729,8 +733,9 @@ public class CritiBot implements EventListener {
 					if(tailleAncienne != bot.getEcrits().size()) {
 						bot.updateOpen();
 					}
+					message.getChannel().sendMessage("Mise à jour effectuée.").queue();
 				} catch (IllegalArgumentException | FeedException | IOException e) {
-					jda.getPresence().setStatus(OnlineStatus.DO_NOT_DISTURB);
+					jda.getTextChannelById(737725144390172714L).sendMessage("<@340877529973784586>\n" + e.getStackTrace().toString()).queue();
 					e.printStackTrace();
 				}
 				
@@ -753,7 +758,43 @@ public class CritiBot implements EventListener {
 			}
 		});
 		
+		commands.put("doublons", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
+				bot.doublons();
+				message.getChannel().sendMessage("Doublons supprimés !").queue();
+			}
+			
+		});
 		
+		commands.put("nettoyer_fort", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
+				bot.clean(true);
+				message.getChannel().sendMessage("Écrits abandonnés, refusés, publiés et sans nouvelles supprimés de la liste !").queue();
+			}
+			
+		});
+		
+	}
+	
+	public void doublons() {
+		Vector<String> noms = new Vector<String>();
+		Vector<Ecrit> toDel = new Vector<Ecrit>();
+		for(Ecrit e : ecrits) {
+			if(noms.contains(e.getNom())) {
+				toDel.add(e);
+			} else {
+				noms.add(e.getNom());
+			}
+		}
+		for(Ecrit e : toDel) {
+			ecrits.remove(e);
+		}
 	}
 	
 	public boolean annuler() {
@@ -814,13 +855,14 @@ public class CritiBot implements EventListener {
 							updateOpen();
 						}
 					} catch (IllegalArgumentException | FeedException | IOException e) {
-						jda.getPresence().setStatus(OnlineStatus.DO_NOT_DISTURB);
 						e.printStackTrace();
+						jda.getTextChannelById(737725144390172714L).sendMessage("<@340877529973784586>\n" + e.getStackTrace().toString()).queue();
 					}
 					System.out.println("Shreduled update.");
 				}
 				
 			}, 10, 10, TimeUnit.MINUTES);
+			jda.getPresence().setActivity(Activity.listening("les pleurs des newbies"));
 		}
 		if(event instanceof MessageReactionAddEvent) {
 			MessageReactionAddEvent mrae = (MessageReactionAddEvent) event;
@@ -854,6 +896,7 @@ public class CritiBot implements EventListener {
 								}
 							} else if(mrae.getReactionEmote().getEmote().getIdLong() == henricross && e.getType() == Type.IDEE) {
 								archiver();
+								e.liberer(null);
 								e.setStatus(Status.REFUSE);
 								jda.getTextChannelById(organichan).sendMessage("« " + e.getNom() + " » refusé !").queue();
 								e.removeStatusMessage();
