@@ -292,9 +292,9 @@ public class Ecrit implements Cloneable{
 		embed.setTitle(nom, lien);
 		embed.addField("Type", type.toString(), false);
 		if(status == Status.RESERVE) {
-			embed.addField("Status", status.toString() + " par " + resName, false);
+			embed.addField("Statut", status.toString() + " par " + resName, false);
 		} else
-			embed.addField("Status", status.toString(), false);
+			embed.addField("Statut", status.toString(), false);
 		embed.setFooter("Dernière modification");
 		embed.setTimestamp(Instant.ofEpochMilli(lastUpdate));
 		switch(type) {

@@ -333,7 +333,7 @@ public class CritiBot implements EventListener {
 						+ "`c!réserver_pour {Critère};{Nom}` : Réserve un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
 						+ "`c!libérer {Critère}` : Supprime la réservation d'un écrit si vous êtes la personne l'ayant réservé, ou membre de l'équipe critique, ou que l'écrit a été réservé par procuration. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!réservation {Critère}` : Affiche les informations de réservation d'un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "`c!critiqué {Critère}` : Alias pour c!libérer et c!statut En attente. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!up {Critère}` : Marque un écrit ouvert et le remet au premier plan dans le salon des fils ouverts s'il l'était déjà. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!valider {Critère}` : Change le type du rapport en Rapport si c'était une idée et fait le même effet que c!critiqué. Le Critère doit être assez fin pour aboutir à un unique écrit.", false);
 				b.addField("Commandes de modification d'un écrit",  "`c!statut {Critère};{Statut}` : Change le statut de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!type {Critère};{Type}` : Change le type de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
@@ -699,16 +699,6 @@ public class CritiBot implements EventListener {
 			
 		});
 		
-		commands.put("reouvert", new BotCommand.SearchCommand() {
-			
-			@Override
-			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
-				archiver();
-				e.setStatus(Status.OUVERT);
-				message.getChannel().sendMessage("« " + e.getNom() + " » réouvert !").queue();
-			}
-		});
-		
 		commands.put("refresh_messages", new BotCommand() {
 
 			@Override
@@ -719,9 +709,7 @@ public class CritiBot implements EventListener {
 			
 		});
 		
-		commands.put("réouvert", new BotCommand.Alias(commands.get("reouvert")));
-		commands.put("ouvrir", new BotCommand.Alias(commands.get("reouvert")));
-		commands.put("o", new BotCommand.Alias(commands.get("reouvert")));
+		
 		
 		commands.put("maj", new BotCommand() {
 
@@ -779,6 +767,25 @@ public class CritiBot implements EventListener {
 			}
 			
 		});
+		
+		commands.put("up", new BotCommand.SearchCommand() {
+			
+			@Override
+			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				if(e.getStatusMessage().isInitialized()) {
+					e.getStatusMessage().getMessage().delete().queue();
+					e.setStatusMessage(null);
+				} else if(e.getStatus() != Status.RESERVE) {
+					e.setStatus(Status.OUVERT);
+				}
+				message.getChannel().sendMessage("« " + e.getNom() + " » up !").queue();
+			}
+		});
+		
+		commands.put("réouvert", new BotCommand.Alias(commands.get("up")));
+		commands.put("ouvrir", new BotCommand.Alias(commands.get("up")));
+		commands.put("o", new BotCommand.Alias(commands.get("up")));
+		commands.put("reouvert", new BotCommand.Alias(commands.get("up")));
 		
 	}
 	
