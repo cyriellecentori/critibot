@@ -773,8 +773,7 @@ public class CritiBot implements EventListener {
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
 				if(e.getStatusMessage().isInitialized()) {
-					e.getStatusMessage().getMessage().delete().queue();
-					e.setStatusMessage(null);
+					e.removeStatusMessage();
 				} else if(e.getStatus() != Status.RESERVE) {
 					e.setStatus(Status.OUVERT);
 				}
@@ -793,10 +792,10 @@ public class CritiBot implements EventListener {
 		Vector<String> noms = new Vector<String>();
 		Vector<Ecrit> toDel = new Vector<Ecrit>();
 		for(Ecrit e : ecrits) {
-			if(noms.contains(e.getNom())) {
+			if(noms.contains(basicize(e.getNom()))) {
 				toDel.add(e);
 			} else {
-				noms.add(e.getNom());
+				noms.add(basicize(e.getNom()));
 			}
 		}
 		for(Ecrit e : toDel) {
