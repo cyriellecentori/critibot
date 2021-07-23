@@ -75,6 +75,7 @@ public class CritiBot implements EventListener {
 	private final String unlock = "U+1f513";
 	//private final String cross = "U+274e";
 	private final String prefix;
+	public long lastUpdate;
 	
 	public CritiBot(String token) {
 		this.token = token;
@@ -161,6 +162,9 @@ public class CritiBot implements EventListener {
 		System.exit(0);*/
 		
 		initCommands();
+		
+		lastUpdate = System.currentTimeMillis();
+
 	}
 	
 	public void addNew() throws IllegalArgumentException, MalformedURLException, FeedException, IOException {
@@ -786,6 +790,18 @@ public class CritiBot implements EventListener {
 		commands.put("o", new BotCommand.Alias(commands.get("up")));
 		commands.put("reouvert", new BotCommand.Alias(commands.get("up")));
 		
+		commands.put("manual_update", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				bot.lastUpdate = System.currentTimeMillis();
+				bot.getJda().getPresence().setActivity(Activity.playing("critiquer. Dernière mise à jour forum le " + new SimpleDateFormat("dd MMM yyyy à HH:mm").format(new Date(lastUpdate))));
+				message.getChannel().sendMessage("Bot indiqué comme mis à jour.").queue();
+				
+			}
+			
+		});
+		
 	}
 	
 	public void doublons() {
@@ -868,7 +884,8 @@ public class CritiBot implements EventListener {
 				}
 				
 			}, 10, 10, TimeUnit.MINUTES);
-			jda.getPresence().setActivity(Activity.listening("les pleurs des newbies"));
+			jda.getPresence().setActivity(Activity.playing("critiquer. Aucune mise à jour forum depuis le redémarrage."));
+
 		}
 		if(event instanceof MessageReactionAddEvent) {
 			MessageReactionAddEvent mrae = (MessageReactionAddEvent) event;
