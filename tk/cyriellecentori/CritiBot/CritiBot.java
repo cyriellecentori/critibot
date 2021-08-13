@@ -1,6 +1,7 @@
 package tk.cyriellecentori.CritiBot;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -797,6 +798,16 @@ public class CritiBot implements EventListener {
 				bot.lastUpdate = System.currentTimeMillis();
 				bot.getJda().getPresence().setActivity(Activity.playing("critiquer. Dernière mise à jour forum le " + new SimpleDateFormat("dd MMM yyyy à HH:mm").format(new Date(lastUpdate))));
 				message.getChannel().sendMessage("Bot indiqué comme mis à jour.").queue();
+				
+			}
+			
+		});
+		
+		commands.put("bdd", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				message.getChannel().sendFile(new File("critibot.json")).queue();
 				
 			}
 			
