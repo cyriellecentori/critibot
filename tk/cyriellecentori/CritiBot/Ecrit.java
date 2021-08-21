@@ -104,14 +104,16 @@ public class Ecrit implements Cloneable{
 	private String resName = "";
 	private long resDate = 0;
 	private long lastUpdate = 0;
+	private String auteur = "";
 	
 	private BotMessage statusMessage = new BotMessage();
 	
-	Ecrit(String nom, String lien, Type type, Status status) {
+	Ecrit(String nom, String lien, Type type, Status status, String auteur) {
 		this.nom = nom;
 		this.lien = lien;
 		this.type = type;
 		this.status = status;
+		this.auteur = auteur;
 		lastUpdate = System.currentTimeMillis();
 	}
 	
@@ -296,6 +298,7 @@ public class Ecrit implements Cloneable{
 		} else
 			embed.addField("Statut", status.toString(), false);
 		embed.setFooter("Dernière modification");
+		embed.setAuthor(auteur);
 		embed.setTimestamp(Instant.ofEpochMilli(lastUpdate));
 		switch(type) {
 		case AUTRE:
@@ -319,5 +322,15 @@ public class Ecrit implements Cloneable{
 	
 	public Type getType() {
 		return type;
+	}
+	
+	public String getAuteur() {
+		return auteur;
+	}
+	
+	public void setAuteur(String auteur) {
+		this.auteur = auteur;
+		if(this.statusMessage.isInitialized())
+			this.statusMessage.getMessage().editMessage(this.toEmbed()).queue();
 	}
 }
