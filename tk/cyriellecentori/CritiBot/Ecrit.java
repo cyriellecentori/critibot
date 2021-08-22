@@ -117,6 +117,15 @@ public class Ecrit implements Cloneable{
 		lastUpdate = System.currentTimeMillis();
 	}
 	
+	public void check() {
+		if(nom == null)
+			nom = "";
+		if(lien == null)
+			lien = "";
+		if(auteur == null)
+			auteur = "";
+	}
+	
 	public boolean setStatusMessage(Message message) {
 		boolean change = true;
 		if(statusMessage.isInitialized()) {

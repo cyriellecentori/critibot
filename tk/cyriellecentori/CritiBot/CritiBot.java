@@ -10,6 +10,7 @@ import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Stack;
@@ -42,6 +43,7 @@ import net.dv8tion.jda.api.events.ReadyEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.EventListener;
+import tk.cyriellecentori.CritiBot.BotCommand.Alias;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -89,11 +91,11 @@ public class CritiBot implements EventListener {
 			henricross = 843965099986780200L;
 		} else {
 			prefix = "bc";
-			organichan = 843885689397575740L;
-			henritueur = 843938845724115009L;
-			openchan = 843884076821643286L;
-			henricheck = 843965501671473174L;
-			henricross = 843965494142173215L;
+			organichan = 878917114474410004L;
+			henritueur = 470138432723877888L;
+			openchan = 878917114474410004L;
+			henricheck = 470138433185120256L;
+			henricross = 587611157158952971L;
 			System.out.println("Booting in beta.");
 		}
 		
@@ -146,6 +148,10 @@ public class CritiBot implements EventListener {
 		if(ecrits == null)
 			ecrits = new Vector<Ecrit>();
 		
+		for(Ecrit e : ecrits) {
+			e.check();
+		}
+		
 		/*Vector<Ecrit> nouveau = new Vector<Ecrit>();
 		java.util.Random r = new java.util.Random();
 		for(Ecrit e : ecrits) {
@@ -168,11 +174,13 @@ public class CritiBot implements EventListener {
 
 	}
 	
+	@SuppressWarnings("unchecked")
 	public void addNew() throws IllegalArgumentException, MalformedURLException, FeedException, IOException {
 		SyndFeed feed = new SyndFeedInput().build(new XmlReader(new URL("http://fondationscp.wikidot.com/feed/forum/ct-656675.xml")));
 		Date lastDate = new Date(0);
 		for(Object e : feed.getEntries()) {
 			SyndEntry entry = (SyndEntry) e;
+			
 			if(entry.getPublishedDate().after(new Date(lastCheck))) {
 				if(entry.getTitle().contains("]")) {
 					Type type = null;
@@ -205,7 +213,8 @@ public class CritiBot implements EventListener {
 					} else {
 						type = Type.RAPPORT;
 					}
-					Ecrit ecrit = new Ecrit(unclean, entry.getLink(), type, Status.OUVERT, entry.getAuthor());
+
+					Ecrit ecrit = new Ecrit(unclean, entry.getLink(), type, Status.OUVERT, ((ArrayList<org.jdom.Element>) entry.getForeignMarkup()).get(0).getText());
 					ecrits.add(ecrit);
 					
 				} else {
@@ -315,6 +324,7 @@ public class CritiBot implements EventListener {
 	}
 	
 	public void updateOpen() {
+		/*
 		for(Ecrit e : ecrits) {
 			if(e.getStatus() == Status.OUVERT && !e.getStatusMessage().isInitialized()) {
 				Message m = jda.getTextChannelById(openchan).sendMessage(e.toEmbed()).complete();
@@ -339,6 +349,7 @@ public class CritiBot implements EventListener {
 				if(e.getStatusMessage().getMessage().getChannel().getIdLong() == organichan)
 					e.removeStatusMessage();
 		}
+		*/
 	}
 	
 	public void refreshMessages() {
@@ -777,8 +788,8 @@ public class CritiBot implements EventListener {
 						bot.updateOpen();
 					}
 					message.getChannel().sendMessage("Mise à jour effectuée.").queue();
-				} catch (IllegalArgumentException | FeedException | IOException e) {
-					jda.getTextChannelById(737725144390172714L).sendMessage("<@340877529973784586>\n" + e.getStackTrace().toString()).queue();
+				} catch (IllegalArgumentException | FeedException | IOException | NullPointerException e) {
+					jda.getTextChannelById(737725144390172714L).sendMessage("<@340877529973784586>\n" + e.getLocalizedMessage()).queue();
 					e.printStackTrace();
 				}
 				
@@ -877,7 +888,7 @@ public class CritiBot implements EventListener {
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
 				archiver();
 				try {
-					e.rename(args[1]);
+					e.setAuteur(args[1]);
 					message.getChannel().sendMessage("« " + args[1] + " » a été défini comme l'auteur(ice) de « " + e.getNom() + " ».").queue();
 				} catch(ArrayIndexOutOfBoundsException ex) {
 					message.getChannel().sendMessage("Utilisation : `c!auteur {Critère};{Auteur}`").queue();
@@ -910,15 +921,16 @@ public class CritiBot implements EventListener {
 								type = Type.getType(args[2]);
 						}
 						for(Ecrit e : ecrits) {
-							boolean ok = e.getAuteur() == aut.get(0);
+							boolean ok = (e.getAuteur().equals(aut.get(0)));
 							if(statut != null) {
 								ok = ok && (e.getStatus() == statut);
 							}
 							if(type != null) {
 								ok = ok && (e.getType() == type);
 							}
-							if(ok)
+							if(ok) {
 								res.add(e);
+							}
 						}
 						if(res.isEmpty()) {
 							EmbedBuilder b = new EmbedBuilder();
@@ -958,10 +970,15 @@ public class CritiBot implements EventListener {
 					}
 				} catch(ArrayIndexOutOfBoundsException e) {
 					message.getChannel().sendMessage("Utilisation : `c!recherche_auteur {Critère de l'auteur};[Statut];[Type]`").queue();
+				} catch(NullPointerException e) {
+					e.printStackTrace();
+					message.getChannel().sendMessage("Erreur.").queue();
 				}
 			}
 			
 		});
+		
+		commands.put("ra", new BotCommand.Alias(commands.get("recherche_auteur")));
 		
 		commands.put("taille_bdd", new BotCommand() {
 
