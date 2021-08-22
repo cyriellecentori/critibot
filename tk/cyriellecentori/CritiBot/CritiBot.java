@@ -43,7 +43,6 @@ import net.dv8tion.jda.api.events.ReadyEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.EventListener;
-import tk.cyriellecentori.CritiBot.BotCommand.Alias;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -53,7 +52,6 @@ import tk.cyriellecentori.CritiBot.Ecrit.Type;
  * Classe principale du bot.
  */
 public class CritiBot implements EventListener {
-	
 	
 	public static void main(String[] args) {
 		if(args.length < 1) { // Le token du bot se place en premier paramètre au lancement.

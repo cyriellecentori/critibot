@@ -3,7 +3,6 @@ package tk.cyriellecentori.CritiBot;
 import java.awt.Color;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.time.temporal.TemporalAccessor;
 import java.util.Date;
 
 import com.google.gson.Gson;
@@ -14,7 +13,6 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
-import net.dv8tion.jda.api.entities.User;
 
 /**
  * Représente un fil sur le forum.
