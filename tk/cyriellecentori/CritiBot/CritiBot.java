@@ -2,9 +2,11 @@ package tk.cyriellecentori.CritiBot;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.ParseException;
@@ -380,8 +382,9 @@ public class CritiBot implements EventListener {
 		// Récupère la liste de tous les auteurs de la base de données.
 		Vector<String> auteurList = new Vector<String>();
 		for(Ecrit e : ecrits) {
-			if(!auteurList.contains(e.getAuteur()))
+			if(!auteurList.contains(e.getAuteur())) {
 				auteurList.add(e.getAuteur());
+			}
 		}
 		
 		// Recherche les auteurs de la même manière que la recherche d'écrits : se référer à celle-ci pour plus de commentaires.
@@ -436,7 +439,7 @@ public class CritiBot implements EventListener {
 	 * Vérifie que tous les écrits ouverts et réservés soient présents dans leur salon dédié.
 	 */
 	public void updateOpen() {
-		for(Ecrit e : ecrits) {
+		for(Ecrit e : sortByDate(ecrits)) {
 			// Vérification des écrits ouverts : si l'écrit est ouvert mais n'a pas de message, il faut lui créer.
 			if(e.getStatus() == Status.OUVERT && !e.getStatusMessage().isInitialized()) {
 				Message m = jda.getTextChannelById(openchan).sendMessage(e.toEmbed()).complete();
@@ -485,6 +488,41 @@ public class CritiBot implements EventListener {
 				e.getStatusMessage().getMessage().editMessage(e.toEmbed()).queue();
 			}
 		}
+	}
+	
+	/**
+	 * Méthode de fusion pour le tri fusion qui suit.
+	 */
+	public Vector<Ecrit> merge(Vector<Ecrit> a, Vector<Ecrit> b) {
+		Vector<Ecrit> res = new Vector<Ecrit>();
+		int i = 0,j = 0;
+		while(i < a.size() && j < b.size()) {
+			if(a.get(i).getLastUpdateLong() < b.get(i).getLastUpdateLong()) {
+				res.add(a.get(i));
+				i++;
+			} else {
+				res.add(b.get(j));
+				j++;
+			}
+		}
+		for(; i < a.size(); i++) {
+			res.add(a.get(i));
+		}
+		for(; j < b.size(); j++) {
+			res.add(b.get(j));
+		}
+		return res;
+	}
+	
+	/**
+	 * Trie les écrits par ordre croissant de date de dernière modification.
+	 * Tri utilisé : tri fusion.
+	 */
+	public Vector<Ecrit> sortByDate(Vector<Ecrit> toSort) {
+		if(toSort.size() < 2)
+			return toSort;
+		return merge(sortByDate((Vector<Ecrit>) toSort.subList(0, toSort.size() / 2)), 
+				sortByDate((Vector<Ecrit>) toSort.subList(toSort.size() + 1, toSort.size())));
 	}
 	
 	/**
@@ -561,7 +599,7 @@ public class CritiBot implements EventListener {
 					Vector<String> messages = new Vector<String>();
 					// Sépare les résultats de la recherche pour que chaque message n'excède pas les 2 000 caractères.
 					String buffer = "";
-					for(Ecrit e : ecrits) { // Recherche tous les écrits respectant les critères demandés et les ajoute aux résultats.
+					for(Ecrit e : sortByDate(ecrits)) { // Recherche tous les écrits respectant les critères demandés et les ajoute aux résultats.
 						if(e.complyWith(type, status)) {
 							// Remplit d'abord un buffer puis lorsqu'il est trop grand, ajoute son contenu dans « messages » et le vide.
 							String toAdd = "[**" + e.getNom() + "**](" + e.getLien() + ")\n" + e.getAuteur() + "\n" + e.getStatus() + " — " + e.getType() + "\n\n";
@@ -764,6 +802,19 @@ public class CritiBot implements EventListener {
 			}
 		});
 		
+		commands.put("refuser", new BotCommand.SearchCommand() {
+			
+			@Override
+			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				e.liberer(null);
+				e.setStatus(Status.REFUSE);
+				message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » a été refusé.").queue();
+				
+			}
+		});
+		
+		commands.put("refusé", new BotCommand.Alias(commands.get("refuser")));
+		
 		commands.put("réservation", new BotCommand.SearchCommand() {
 			
 			@Override
@@ -843,7 +894,7 @@ public class CritiBot implements EventListener {
 					date = new SimpleDateFormat("dd/MM/yyyy").parse(args[0]).getTime();
 					int n = 0;
 					for(Ecrit e : bot.getEcrits()) {
-						if(e.olderThan(date)) {
+						if(e.olderThan(date) && !e.isDead()) {
 							e.setStatus(Status.SANS_NOUVELLES);
 							n++;
 						}

@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Vector;
 
 import com.google.gson.Gson;
 
@@ -160,6 +161,8 @@ public class Ecrit implements Cloneable{
 	 */
 	private BotMessage statusMessage = new BotMessage();
 	
+	public Vector<String> interesses = new Vector<String>();
+	
 	Ecrit(String nom, String lien, Type type, Status status, String auteur) {
 		this.nom = nom;
 		this.lien = lien;
@@ -179,6 +182,8 @@ public class Ecrit implements Cloneable{
 			lien = "";
 		if(auteur == null)
 			auteur = "";
+		if(interesses == null)
+			interesses = new Vector<String>();
 	}
 	
 	/**
@@ -380,6 +385,13 @@ public class Ecrit implements Cloneable{
 	 */
 	public String getLastUpdate() {
 		return new SimpleDateFormat("dd MMM yyyy à HH:mm").format(new Date(lastUpdate));
+	}
+	
+	/**
+	 * @return la date de dernière mise à jour en format numérique.
+	 */
+	public long getLastUpdateLong() {
+		return lastUpdate;
 	}
 	
 	/**
