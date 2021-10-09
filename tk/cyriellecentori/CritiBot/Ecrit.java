@@ -37,7 +37,8 @@ public class Ecrit implements Cloneable{
 		RESERVE("Réservé"),
 		VALIDE("Validé"),
 		REFUSE("Refusé"),
-		INFRACTION("Infraction");
+		INFRACTION("Infraction"),
+		OUVERT_PLUS("Ouvert*");
 		/**
 		 * Équivalent du statut en chaîne de caractères.
 		 */
@@ -67,7 +68,7 @@ public class Ecrit implements Cloneable{
 			} else if(str.equalsIgnoreCase(PUBLIE.nom)) {
 				return PUBLIE;
 			} else if(str.equalsIgnoreCase(RESERVE.nom)) {
-				return RESERVE;
+				return OUVERT_PLUS; // TODO delete this
 			} else if(str.equalsIgnoreCase(VALIDE.nom)){
 				return VALIDE;
 			} else if(str.equalsIgnoreCase(REFUSE.nom)) {
@@ -76,6 +77,8 @@ public class Ecrit implements Cloneable{
 				return ABANDONNE;
 			} else if(str.equalsIgnoreCase(INFRACTION.nom)) {
 				return INFRACTION;
+			} else if(str.equalsIgnoreCase(OUVERT_PLUS.nom)) {
+				return OUVERT_PLUS;
 			} else {
 				return INCONNU;
 			}
@@ -121,6 +124,28 @@ public class Ecrit implements Cloneable{
 		}
 	}
 	
+	public class Interet {
+		public final String name;
+		public final long date;
+		
+		public Interet(String name, long date) {
+			this.name = name;
+			this.date = date;
+		}
+
+		public String getDate() {
+			return new SimpleDateFormat("dd MMM yyyy à HH:mm").format(new Date(date));
+		}
+	}
+	
+	public class InteretMembre extends Interet {
+		public final long member;
+		
+		public InteretMembre(Member member, long date) {
+			super(member.getEffectiveName(), date);
+			this.member = member.getIdLong();
+		}
+	}
 	/**
 	 * Nom de l'écrit.
 	 */
@@ -132,22 +157,6 @@ public class Ecrit implements Cloneable{
 	private Type type = null;
 	private Status status = null;
 	/**
-	 * Statut précédent de l'écrit, pour pouvoir le remettre après la fin d'une réservation.
-	 */
-	private Status old = null;
-	/**
-	 * Identifiant Discord de l'utilisateur ayant réservé l'écrit, 0 s'il n'y a pas de réservation.
-	 */
-	private long reservation = 0;
-	/**
-	 * Nom de la personne ayant réservé l'écrit.
-	 */
-	private String resName = "";
-	/**
-	 * Date de la réservation.
-	 */
-	private long resDate = 0;
-	/**
 	 * Date de la dernière mise à jour de l'écrit.
 	 */
 	private long lastUpdate = 0;
@@ -155,18 +164,22 @@ public class Ecrit implements Cloneable{
 	 * Auteur de l'écrit.
 	 */
 	private String auteur = "";
-	
 	/**
-	 * Message de statut de l'écrit.
+	 * Personnes ayant manifesté de l'intérêt pour critiquer cet écrit.
 	 */
-	private BotMessage statusMessage = new BotMessage();
+	public Vector<Interet> interesses = new Vector<Interet>();
 	
-	public Vector<String> interesses = new Vector<String>();
+	/*
+	 * Drapeau identifiant l'écrit comme modifié, permettant donc aux affichans de modifier son message.
+	 */
+	public boolean edited = false;
 	
 	Ecrit(String nom, String lien, Type type, Status status, String auteur) {
 		this.nom = nom;
 		this.lien = lien;
 		this.type = type;
+		if(status == Status.OUVERT_PLUS)
+			status = Status.OUVERT;
 		this.status = status;
 		this.auteur = auteur;
 		lastUpdate = System.currentTimeMillis();
@@ -183,49 +196,9 @@ public class Ecrit implements Cloneable{
 		if(auteur == null)
 			auteur = "";
 		if(interesses == null)
-			interesses = new Vector<String>();
-	}
-	
-	/**
-	 * Change de message de statut.
-	 * @param message
-	 * @return `true` si le changement est réussi, `false` sinon.
-	 */
-	public boolean setStatusMessage(Message message) {
-		boolean change = true;
-		if(statusMessage.isInitialized()) {
-			change = false;
-		}
-		if(change) {
-			this.statusMessage = new BotMessage(message);
-		}
-		return change;
-	}
-	
-	/**
-	 * Supprime le message de statut.
-	 */
-	public void removeStatusMessage() {
-		statusMessage.getMessage().delete().complete();
-		statusMessage = new BotMessage();
-	}
-	
-	public BotMessage getStatusMessage() {
-		return statusMessage;
-	}
-	
-	/**
-	 * Récupère le lien API vers le message de statut, si disponible.
-	 * @param jda
-	 */
-	public void check(JDA jda) {
-		if(lastUpdate == 0L)
-			lastUpdate = System.currentTimeMillis();
-		if(statusMessage != null) {
-			if(!statusMessage.isInitialized())
-				statusMessage.retrieve(jda);
-		} else {
-			statusMessage = new BotMessage();
+			interesses = new Vector<Interet>();
+		if(status == Status.RESERVE) {
+			status = Status.OUVERT;
 		}
 	}
 	
@@ -234,75 +207,86 @@ public class Ecrit implements Cloneable{
 	}
 	
 	/**
-	 * Réserve un écrit.
-	 * @param member Membre du Discord tentant de réserver l'écrit.
-	 * @return `true` si la réservation à réussi.
+	 * Marque un écrit comme cible d'intérets.
+	 * @param member Membre du Discord interessé par l'écrit.
+	 * @return `true` s'il a été possible de marquer l'intérêt.
 	 */
-	public boolean reserver(Member member) {
+	public boolean marquer(Member member) {
 		// Vérifie si l'écrit est réservable.
-		if(!(status == Status.OUVERT || status == Status.ABANDONNE || status == Status.EN_PAUSE || status == Status.INCONNU || status == Status.VALIDE || status == Status.SANS_NOUVELLES))
+		if(!(status == Status.OUVERT || status == Status.OUVERT_PLUS))
 			return false;
 		// Remplit les informations de réservation.
-		resDate = System.currentTimeMillis();
-		reservation = member.getIdLong();
-		old = status;
-		resName = member.getEffectiveName();
-		status = Status.RESERVE;
+		Interet i = new InteretMembre(member, System.currentTimeMillis());
+		interesses.add(i);
+		status = Status.OUVERT_PLUS;
+		edited = true;
 		return true;
 	}
 	
 	/**
-	 * Résere un écrit.
-	 * @param name Nom de l'utilisation réservant l'écrit.
-	 * @return `true` si la réservation à réussi.
+	 * Marque un écrit comme cible d'intérets.
+	 * @param member Nom de l'utilisateur interessé par l'écrit.
+	 * @return `true` s'il a été possible de marquer l'intérêt.
 	 */
-	public boolean reserver(String name) {
-		// Vérifie si l'écrit est réservable.
-		if(!(status == Status.OUVERT || status == Status.ABANDONNE || status == Status.EN_PAUSE || status == Status.INCONNU || status == Status.VALIDE || status == Status.SANS_NOUVELLES))
+	public boolean marquer(String name) {
+		// Vérifie si l'écrit est marquable.
+		if(status != Status.OUVERT && status != Status.OUVERT_PLUS)
 			return false;
-		// Remplit les informations de réservation.
-		resDate = System.currentTimeMillis();
-		reservation = 0;
-		old = status;
-		resName = name;
-		status = Status.RESERVE;
+		// Remplit les informations de marquage.
+		Interet i = new Interet(name, System.currentTimeMillis());
+		interesses.add(i);
+		status = Status.OUVERT_PLUS;
+		edited = true;
 		return true;
 	}
 	
 	/**
-	 * Libère la réservation d'un écrit.
-	 * @param member Membre Discord essayant de libérer l'écrit.
+	 * Libère l'intérêt d'un écrit.
+	 * @param member Membre Discord libérant son interêt sur l'écrit.
+	 * @return `true` si la libération à réussi.
+	 */
+	public boolean liberer(String name) {
+		Interet toDel = null;
+		for(Interet i : interesses) {
+			if(i.name.equals(name))
+				toDel = i;
+		}
+		if(toDel != null)
+			interesses.remove(toDel);
+		if(interesses.size() == 0) {
+			status = Status.OUVERT;
+		}
+		edited = true;
+		return (toDel != null);
+	}
+	
+	/**
+	 * Libère l'intérêt d'un écrit.
+	 * @param member Membre Discord libérant son interêt sur l'écrit.
 	 * @return `true` si la libération à réussi.
 	 */
 	public boolean liberer(Member member) {
-		if(status != Status.RESERVE)
-			return true; // Rien ne sert de libérer si l'écrit n'est pas réservé.
-		try {
-			if(reservation == 0L) { // La réservation n'est que par un nom : libération automatique.
-				resName = "";
-				status = old;
-				return true;
-			  // Sinon, vérifie que la personne souhaitant libérer est la personne ayant réservé,
-			  // un membre de l'équipe critique ou que la réservation est plus vieille que trois jours.
-			} else if(member.getUser().getIdLong() == reservation 
-					|| member.getRoles().contains
-					(member.getGuild().getRoleById(612383955253067963L)) || resDate > 3*24*3600*1000) {
-				reservation = 0;
-				resName = "";
-				status = old;
-				return true;
-			} else
-				return false;
-		} catch(NullPointerException e) { // En gros le null ça veut dire tkt fais-moi confiance bro
-			reservation = 0;
-			resName = "";
-			status = old;
-			return true;
+		Interet toDel = null;
+		for(Interet i : interesses) {
+			if(i instanceof InteretMembre) {
+				if(((InteretMembre) i).member == member.getIdLong()) {
+					toDel = i;
+				}
+			}
 		}
+		if(toDel == null)
+			return liberer(member.getEffectiveName());
+		interesses.remove(toDel);
+		if(interesses.size() == 0) {
+			status = Status.OUVERT;
+		}
+		edited = true;
+		return true;
 	}
 	
-	public String getReservation(Guild guild) {
-			return resName;
+	
+	public Vector<Interet> getInteresses() {
+			return interesses;
 	}
 	
 	public Status getStatus() {
@@ -343,26 +327,30 @@ public class Ecrit implements Cloneable{
 	 */
 	public boolean setStatus(Status status) {
 		// Protection contre la réservation indirecte, utiliser reserver()
-		if(this.status == Status.RESERVE)
-			return false;
-		else if(status == Status.RESERVE)
+		if(status == Status.OUVERT_PLUS)
 			return false;
 		if(status != Status.SANS_NOUVELLES) // Mise à jour de la date de dernière modification, sauf si on indique l'écrit comme étant sans nouvelles.
 			lastUpdate = System.currentTimeMillis();
+		if(this.status == Status.OUVERT_PLUS) {
+			deleteInteret();
+		}
 		this.status = status;
-		if(this.statusMessage.isInitialized()) // Met à jour le message de statut si possible.
-			this.statusMessage.getMessage().editMessage(this.toEmbed()).queue();
+		edited = true;
 		return true;
+	}
+	
+	public void deleteInteret() {
+		interesses.clear();
 	}
 	
 	public void setType(Type type) {
 		this.type = type;
-		if(this.statusMessage.isInitialized()) // Met à jour le message de statut si possible.
-			this.statusMessage.getMessage().editMessage(this.toEmbed()).queue();
+		edited = true;
 	}
 	
 	public void rename(String newName) {
 		this.nom = newName;
+		edited = true;
 	}
 	
 	/**
@@ -371,13 +359,7 @@ public class Ecrit implements Cloneable{
 	public void promote() {
 		if(type == Type.IDEE)
 			type = Type.RAPPORT;
-	}
-	
-	/**
-	 * @return la date de réservation correctement formatée.
-	 */
-	public String getResDate() {
-		return new SimpleDateFormat("dd MMM yyyy à HH:mm").format(new Date(resDate));
+		edited = true;
 	}
 	
 	/**
@@ -412,19 +394,11 @@ public class Ecrit implements Cloneable{
 	 * Indique l'écrit comme critiqué.
 	 * @param u Membre ayant critiqué.
 	 */
-	public boolean critique(Member u) {
+	public void critique() {
 		lastUpdate = System.currentTimeMillis();
-		boolean b = liberer(u);
-		if(!b) {
-			resName = "";
-			reservation = 0;
-		}
+		deleteInteret();
 		status = Status.EN_ATTENTE;
-		return b;
-	}
-	
-	public long getResId() {
-		return reservation;
+		edited = true;
 	}
 	
 	public String getLien() {
@@ -438,10 +412,14 @@ public class Ecrit implements Cloneable{
 		EmbedBuilder embed = new EmbedBuilder();
 		embed.setTitle(nom, lien);
 		embed.addField("Type", type.toString(), false);
-		if(status == Status.RESERVE) {
-			embed.addField("Statut", status.toString() + " par " + resName, false);
-		} else
-			embed.addField("Statut", status.toString(), false);
+		embed.addField("Statut", status.toString(), false);
+		if(status == Status.OUVERT_PLUS) {
+			String interesList = "";
+			for(Interet i : interesses) {
+				interesList += i.name + " le " + i.getDate() + "\n";
+			}
+			embed.addField("Marques d'intérêt", interesList, false);
+		}
 		embed.setFooter(String.valueOf(hashCode()));
 		embed.setAuthor(auteur);
 		embed.setTimestamp(Instant.ofEpochMilli(lastUpdate));
@@ -475,8 +453,7 @@ public class Ecrit implements Cloneable{
 	
 	public void setAuteur(String auteur) {
 		this.auteur = auteur;
-		if(this.statusMessage.isInitialized())
-			this.statusMessage.getMessage().editMessage(this.toEmbed()).queue();
+		edited = true;
 	}
 
 	@Override

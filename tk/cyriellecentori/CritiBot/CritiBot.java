@@ -2,11 +2,9 @@ package tk.cyriellecentori.CritiBot;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.ParseException;
@@ -17,6 +15,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Stack;
 import java.util.Vector;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -37,14 +36,15 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
-import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.ReadyEvent;
+import net.dv8tion.jda.api.events.message.MessageDeleteEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.EventListener;
+import tk.cyriellecentori.CritiBot.BotCommand.Alias;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -78,7 +78,7 @@ public class CritiBot implements EventListener {
 	private String token;
 	
 	private JDABuilder builder;
-	private JDA jda;
+	public JDA jda;
 	
 	private Gson gson;
 	
@@ -99,28 +99,25 @@ public class CritiBot implements EventListener {
 	 */
 	private LinkedHashMap<String, BotCommand> commands = new LinkedHashMap<String, BotCommand>();
 	
-	private Affichan[] affichans = {
-			new Affichan(843956373103968308L, new Status[] {Status.OUVERT, Status.RESERVE}, null),
-			new Affichan(614947463610236939L, new Status[] {Status.RESERVE}, null)
-	};
+	private Affichan[] affichans;
 	
 	/**
 	 * L'emote de réservation.
 	 */
-	private final long henritueur;
+	public final long henritueur;
 	/**
 	 * L'emote indiquant l'écrit comme critiqué.
 	 */
-	private final long henricheck;
+	public final long henricheck;
 	/**
 	 * L'emote indiquant l'écrit comme refusé.
 	 */
-	private final long henricross;
+	public final long henricross;
 	//private final String whiteCheckBox = "U+2705";
 	/**
 	 * L'emoji cadenas ouvert.
 	 */
-	private final String unlock = "U+1f513";
+	public final String unlock = "U+1f513";
 	//private final String cross = "U+274e";
 	/**
 	 * Le préfixe du bot.
@@ -131,22 +128,33 @@ public class CritiBot implements EventListener {
 	 */
 	public long lastUpdate;
 	
+	/**
+	 * Le salon « Organisation »
+	 */
+	public final long organichan;
+	
 	public CritiBot(String token) {
 		this.token = token;
 		if(token.hashCode() == 1973164890) { // Si le bot est connecté à l'utilisateur Critibot#8684, les salons sont ceux du discord des Critiqueurs.
 			prefix = "c";
-			organichan = 614947463610236939L;
 			henritueur = 817064076244418610L;
-			openchan = 843956373103968308L;
 			henricheck = 843965097428516864L;
 			henricross = 843965099986780200L;
+			organichan = 614947463610236939L;
+			affichans = new Affichan[] {
+					new Affichan(843956373103968308L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null),
+					new Affichan(614947463610236939L, new Status[] {Status.OUVERT_PLUS}, null)
+			};
 		} else { // Sinon, le bot est considéré comme étant en bêta et les salons sont ceux de BrainBot's lair.
 			prefix = "bc";
-			organichan = 878917114474410004L;
 			henritueur = 470138432723877888L;
-			openchan = 878917114474410004L;
 			henricheck = 470138433185120256L;
 			henricross = 587611157158952971L;
+			organichan = 737725144390172714L;
+			affichans = new Affichan[] {
+					new Affichan(878917114474410004L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null),
+					new Affichan(737725144390172714L, new Status[] {Status.OUVERT_PLUS}, null)
+			};
 			System.out.println("Booting in beta.");
 		}
 		
@@ -437,37 +445,11 @@ public class CritiBot implements EventListener {
 	 * Vérifie que tous les écrits ouverts et réservés soient présents dans leur salon dédié.
 	 */
 	public void updateOpen() {
-	
-	
-		// Attention bug lorsque le bot cherche à supprimer un message qui a été supprimé manuellement ! Génère une exception.
-		
-	
-		for(Ecrit e : sortByDate(ecrits)) {
-			// Vérification des écrits ouverts : si l'écrit est ouvert mais n'a pas de message, il faut lui créer.
-			if(e.getStatus() == Status.OUVERT && !e.getStatusMessage().isInitialized()) {
-				Message m = jda.getTextChannelById(openchan).sendMessage(e.toEmbed()).complete();
-				e.setStatusMessage(m);
-				m.addReaction(jda.getEmoteById(henritueur)).queue();
-				m.addReaction(jda.getEmoteById(henricheck)).queue();
-				if(e.getType() == Type.IDEE)
-					m.addReaction(jda.getEmoteById(henricross)).queue();
-			} else if(e.getStatus() != Status.OUVERT && e.getStatusMessage().isInitialized()) { // Si l'écrit n'est pas ouvert et qu'il a un message dans le chan des écrits ouverts, il faut le supprimer.
-				if(e.getStatusMessage().getMessage().getChannel().getIdLong() == openchan) {
-					e.removeStatusMessage();
-				}
-			}
-			
-			// Vérification des écrits réservés de la même manière.
-			if(e.getStatus() == Status.RESERVE && !e.getStatusMessage().isInitialized()) {
-				Message m = jda.getTextChannelById(organichan).sendMessage(e.toEmbed()).complete();
-				e.setStatusMessage(m);
-				m.addReaction(jda.getEmoteById(henricheck)).queue();
-				if(e.getType() == Type.IDEE)
-					m.addReaction(jda.getEmoteById(henricross)).queue();
-				m.addReaction(unlock).queue();
-			} else if(e.getStatus() != Status.RESERVE && e.getStatusMessage().isInitialized())
-				if(e.getStatusMessage().getMessage().getChannel().getIdLong() == organichan)
-					e.removeStatusMessage();
+		for(Affichan aff : affichans) {
+			aff.update(this);
+		}
+		for(Ecrit e : ecrits) {
+			e.edited = false;
 		}
 	}
 	
@@ -475,21 +457,9 @@ public class CritiBot implements EventListener {
 	 * Supprime tous les messages des écrits. updateOpen() étant appelé à chaque commande, tous les messages seront recrées juste après.
 	 */
 	public void refreshMessages() {
-		for(Ecrit e : ecrits) {
-			if(e.getStatusMessage().isInitialized()) {
-				e.removeStatusMessage();
-			}
-		}
-	}
-	
-	/**
-	 * Met à jour les messages des écrits en les modifiant tous.
-	 */
-	public void updateMessages() {
-		for(Ecrit e : ecrits) {
-			if(e.getStatusMessage().isInitialized()) {
-				e.getStatusMessage().getMessage().editMessage(e.toEmbed()).queue();
-			}
+		for(Affichan aff : affichans) {
+			aff.purge(jda);
+			aff.update(this);
 		}
 	}
 	
@@ -500,7 +470,7 @@ public class CritiBot implements EventListener {
 		Vector<Ecrit> res = new Vector<Ecrit>();
 		int i = 0,j = 0;
 		while(i < a.size() && j < b.size()) {
-			if(a.get(i).getLastUpdateLong() < b.get(i).getLastUpdateLong()) {
+			if(a.get(i).getLastUpdateLong() < b.get(j).getLastUpdateLong()) {
 				res.add(a.get(i));
 				i++;
 			} else {
@@ -524,8 +494,8 @@ public class CritiBot implements EventListener {
 	public Vector<Ecrit> sortByDate(Vector<Ecrit> toSort) {
 		if(toSort.size() < 2)
 			return toSort;
-		return merge(sortByDate((Vector<Ecrit>) toSort.subList(0, toSort.size() / 2)), 
-				sortByDate((Vector<Ecrit>) toSort.subList(toSort.size() + 1, toSort.size())));
+		return merge(sortByDate(new Vector<Ecrit>(toSort.subList(0, toSort.size() / 2))), 
+				sortByDate(new Vector<Ecrit>(toSort.subList(toSort.size() / 2 + 1, toSort.size()))));
 	}
 	
 	/**
@@ -537,20 +507,20 @@ public class CritiBot implements EventListener {
 				EmbedBuilder b = new EmbedBuilder();
 				b.setTitle("Aide de Critibot");
 				b.setDescription("Les paramètres entre crochets sont optionnels, entre accolades obligatoires.");
-				b.addField("Valeurs de Statut", "Statut doit être « Ouvert — En attente — Abandonné — En pause — Sans nouvelles — Inconnu — Publié — Réservé — Validé — Refusé — Infraction »", false);
+				b.addField("Valeurs de Statut", "Statut doit être « Ouvert — Ouvert* — En attente — Abandonné — En pause — Sans nouvelles — Inconnu — Publié — Réservé — Validé — Refusé — Infraction ». « Ouvert* » correspond aux écrits ouverts possédant des marques d'intérêt, il ne peut être assigné manuellement.", false);
 				b.addField("Valeurs de Type", "Type doit être « Conte — Rapport — Idée — Autre »", false);
 				b.addField("Commandes de base", "`c!aide` : Cette commande d'aide.\n"
 						+ "`c!annuler` : Annule la dernière modification effectuée.", false);
-				b.addField("Commandes de gestion et d'affichage de la liste", "`c!ajouter {Nom};{Type};{Statut};{URL}` : Ajoute manuellement un écrit à la liste.\n"
+				b.addField("Commandes de gestion et d'affichage de la liste", "`c!ajouter {Nom};{Auteur};{Type};{Statut};{URL}` : Ajoute manuellement un écrit à la liste.\n"
 						+ "`c!supprimer {Critère}` : Supprime un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit. __**ATTENTION**__ : Il n'y a pas de confirmation, faites attention à ne pas vous tromper dans le Critère.\n"
 						+ "`c!inbox` : Affiche la boîte de réception, contenant les écrits qui n'ont pas pu être ajoutés automatiquement. Attention, l'appel à cette commande supprime le contenu de la boîte.", false);
 				b.addField("Commandes de recherche", "`c!rechercher {Critère}` : Affiche tous les écrits contenant {Critère}.\n"
 						+ "`c!lister {Statut};[Type]` : Affiche la liste des écrits avec le statut et du type demandés. Statut et Type peuvent prendre la valeur « Tout ».\n"
 						+ "`c!recherche_auteur {Critère de l'auteur};[Statut];[Type]` : Affiche la liste des écrits de l'auteur demandé, avec le statut et le type demandés si présents. Statut et Type peuvent prendre la valeur « Tout ». Le {Critère de l'auteur} fonctionne de la même manière que la recherche d'écrits. Il doit être également assez précis pour aboutir à un unique auteur.", false);
-				b.addField("Commandes de critiques", "`c!réserver {Critère}` : Réserve un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "`c!réserver_pour {Critère};{Nom}` : Réserve un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
-						+ "`c!libérer {Critère}` : Supprime la réservation d'un écrit si vous êtes la personne l'ayant réservé, ou membre de l'équipe critique, ou que l'écrit a été réservé par procuration. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "`c!réservation {Critère}` : Affiche les informations de réservation d'un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+				b.addField("Commandes de critiques", "`c!marquer {Critère}` : Ajoute une marque d'intérêt à un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!marquer_pour {Critère};{Nom}` : Marque d'intérêt un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
+						+ "`c!libérer {Critère}` : Supprime votre marque d'intétêt sur un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
+						+ "`c!libérer_pour {Critère};{Nom}` : Supprime l'intêret de qulequ'un sur un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit."
 						+ "`c!up {Critère}` : Marque un écrit ouvert et le remet au premier plan dans le salon des fils ouverts s'il l'était déjà. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!valider {Critère}` : Change le type du rapport en Rapport si c'était une idée et fait le même effet que c!critiqué. Le Critère doit être assez fin pour aboutir à un unique écrit.", false);
 				b.addField("Commandes de modification d'un écrit",  "`c!statut {Critère};{Statut}` : Change le statut de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
@@ -564,7 +534,7 @@ public class CritiBot implements EventListener {
 						+ "`c!nettoyer_fort` : Supprime tous les écrits abandonnés / refusés / publiés / sans nouvelles de la liste.\n"
 						+ "`c!doublons` : Supprime les éventuels doublons.", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 1.5");
+				b.setFooter("Version 2.0");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message.getChannel().sendMessage(b.build()).queue();
 			}
@@ -602,6 +572,7 @@ public class CritiBot implements EventListener {
 					Vector<String> messages = new Vector<String>();
 					// Sépare les résultats de la recherche pour que chaque message n'excède pas les 2 000 caractères.
 					String buffer = "";
+					try {
 					for(Ecrit e : sortByDate(ecrits)) { // Recherche tous les écrits respectant les critères demandés et les ajoute aux résultats.
 						if(e.complyWith(type, status)) {
 							// Remplit d'abord un buffer puis lorsqu'il est trop grand, ajoute son contenu dans « messages » et le vide.
@@ -613,6 +584,9 @@ public class CritiBot implements EventListener {
 							buffer += toAdd;
 						}
 							
+					}
+					} catch(IndexOutOfBoundsException e) {
+						e.printStackTrace();
 					}
 					if(buffer.isEmpty()) { // Si le buffer est vide, c'est qu'il n'a jamais été rempli : aucun résultat, donc.
 						EmbedBuilder b = new EmbedBuilder();
@@ -711,38 +685,34 @@ public class CritiBot implements EventListener {
 		
 		commands.put("s", new BotCommand.Alias(commands.get("rechercher")));
 		
-		commands.put("réserver", new BotCommand.SearchCommand() {
+		commands.put("marquer", new BotCommand.SearchCommand() {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
-				message.getMessage().delete().queue(); // Supprime la commande
 				archiver();
-				if(e.reserver(message.getMember())) { // Tente de réserver l'écrit
-					message.getChannel().sendMessage("« " + e.getNom() + " » réservé par " + message.getAuthor().getName() + " !").queue();
-				} else {
-					message.getAuthor().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être réservé. Il l'est peut-être déjà, ou n'a pas un statut réservable. Les écrits pouvant être réservés sont les écrits Ouverts, Abandonnés, En Pause, Validés, Sans Nouvelles ou au statut inconnu. Vous pouvez également tenter de libérer l'écrit si vous faites partie de l'Équipe Critique ou que l'écrit est réservé depuis plus de trois jours.").queue();
-				}
+				if(e.marquer(message.getMember()))
+					message.getChannel().sendMessage("« " + e.getNom() + " » marqué par " + message.getMember().getEffectiveName() + " !").queue();
+				else
+					message.getChannel().sendMessage("« " + e.getNom() + " » ne peut avoir une marque d'intérêt car il n'est pas ouvert.").queue();
 			}
 		});
+
 		
-		commands.put("r", new BotCommand.Alias(commands.get("réserver")));
-		
-		commands.put("reserver", new BotCommand.Alias(commands.get("réserver")));
-		
+		commands.put("m", new BotCommand.Alias(commands.get("marquer")));
+				
 		commands.put("libérer", new BotCommand.SearchCommand() {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
-				message.getMessage().delete().queue(); // Supprime la commande
 				archiver();
-				if(e.getStatus() != Status.RESERVE) {
-					message.getChannel().sendMessage("« " + e.getNom() + " » n'est pas réservé.").queue();
+				if(e.getStatus() != Status.OUVERT_PLUS) {
+					message.getChannel().sendMessage("« " + e.getNom() + " » n'a aucune marque d'intérêt.").queue();
 					return;
 				}
 				if(e.liberer(message.getMember())) {
-					message.getChannel().sendMessage("Réservation sur « " + e.getNom() + " » supprimée.").queue();
+					message.getChannel().sendMessage("Marque d'intérêt sur « " + e.getNom() + " » supprimée.").queue();
 				} else {
-					message.getAuthor().openPrivateChannel().complete().sendMessage("Vous n'êtes pas à l'origine de la réservation sur « " + e.getNom() + " » ou vous n'êtes pas de l'équipe critique.").queue();
+					message.getChannel().sendMessage("Vous n'avez pas de marque d'intérêt sur « " + e.getNom() + " ».").queue();
 				}
 			}
 		});
@@ -757,7 +727,7 @@ public class CritiBot implements EventListener {
 			}
 		});
 		
-		commands.put("status", new BotCommand.SearchCommand() {
+		commands.put("statut", new BotCommand.SearchCommand() {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
@@ -765,17 +735,13 @@ public class CritiBot implements EventListener {
 				Status status = Status.getStatus(args[1]);
 				boolean ret = e.setStatus(status);
 				if(!ret) {
-					if(status == Status.RESERVE) {
-						message.getChannel().sendMessage("Utilisez c!réserver pour réserver un écrit.").queue();
-					} else {
-						message.getChannel().sendMessage("Cet écrit est réservé, libérez le d'abord avec c!libérer pour changer son statut.").queue();
-					}
+					message.getChannel().sendMessage("Ce statut ne peut être assigné manuellement.").queue();
 				} else
 					message.getChannel().sendMessage("Statut de « " + e.getNom() + " » changé !").queue();
 			}
 		});
 		
-		commands.put("statut", new BotCommand.Alias(commands.get("status")));
+		commands.put("status", new BotCommand.Alias(commands.get("statut")));
 		
 		commands.put("type", new BotCommand.SearchCommand() {
 			
@@ -796,9 +762,6 @@ public class CritiBot implements EventListener {
 				archiver();
 				e.promote();
 				message.getChannel().sendMessage("Si l'écrit « " + e.getNom() + " » était une idée, c'est maintenant un rapport ! Sinon, rien n'a changé.").queue();
-				if(e.getStatus() == Status.RESERVE)
-					if(!e.liberer(message.getMember()))
-						message.getAuthor().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » a déjà été réservé par quelqu'un d'autre. Je vais cependant vous croire sur le fait que vous avez critiqué l'écrit, mais vous avez probablement enfreint une réservation et c'est pas très gentil.").queue();
 				e.setStatus(Status.EN_ATTENTE);
 				message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » a été noté comme critiqué !").queue();
 				
@@ -809,7 +772,6 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
-				e.liberer(null);
 				e.setStatus(Status.REFUSE);
 				message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » a été refusé.").queue();
 				
@@ -817,20 +779,6 @@ public class CritiBot implements EventListener {
 		});
 		
 		commands.put("refusé", new BotCommand.Alias(commands.get("refuser")));
-		
-		commands.put("réservation", new BotCommand.SearchCommand() {
-			
-			@Override
-			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
-				if(e.getStatus() == Status.RESERVE)
-					message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » est a été réservé par " + e.getReservation(message.getGuild()) + " le " + e.getResDate() + ".").queue();
-				else
-					message.getChannel().sendMessage("L'écrit « " + e.getNom() + " » n'est pas réservé.").queue();
-				
-			}
-		});
-		
-		commands.put("reservation", new BotCommand.Alias(commands.get("réservation")));
 		
 		commands.put("supprimer", new BotCommand.SearchCommand() {
 			
@@ -842,20 +790,46 @@ public class CritiBot implements EventListener {
 			}
 		});
 		
-		commands.put("réserver_pour", new BotCommand.SearchCommand() {
+		commands.put("marquer_pour", new BotCommand.SearchCommand() {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
-				message.getMessage().delete().queue();
+				if(args.length < 2) {
+					message.getChannel().sendMessage("Il manque un argument. Utilisation : c!marquer_pour {Critère};{Utilisateur}").queue();
+					return;
+				}
 				archiver();
-				if(e.reserver(args[1])) {
-					message.getChannel().sendMessage("« " + e.getNom() + " » réservé pour " + args[1] + " !").queue();
+				if(e.marquer(args[1])) {
+					message.getChannel().sendMessage("« " + e.getNom() + " » marqué d'intêret pour " + args[1] + " !").queue();
 				} else {
-					message.getAuthor().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être réservé. Il l'est peut-être déjà, ou n'a pas un statut réservable. Les écrits pouvant être réservés sont les écrits Ouverts, Abandonnés, En Pause, Validés, Sans Nouvelles ou au statut inconnu. Vous pouvez également tenter de libérer l'écrit si vous faites partie de l'Équipe Critique ou que l'écrit est réservé depuis plus de trois jours.").queue();
+					message.getAuthor().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être marqué d'intérêt car il n'est pas ouvert.").queue();
 				}
 				
 			}
 		});
+		
+		commands.put("libérer_pour", new BotCommand.SearchCommand() {
+			
+			@Override
+			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				if(args.length < 2) {
+					message.getChannel().sendMessage("Il manque un argument. Utilisation : c!libérer_pour {Critère};{Utilisateur}").queue();
+					return;
+				}
+				archiver();
+				if(e.getStatus() != Status.OUVERT_PLUS) {
+					message.getChannel().sendMessage("« " + e.getNom() + " » n'a aucune marque d'intérêt.").queue();
+					return;
+				}
+				if(e.liberer(args[1])) {
+					message.getChannel().sendMessage("Marque d'intérêt de " + args[1] + " sur « " + e.getNom() + " » supprimée.").queue();
+				} else {
+					message.getChannel().sendMessage(args[1] + " n'a pas de marque d'intérêt sur « " + e.getNom() + " ».").queue();
+				}
+			}
+		});
+		
+		commands.put("liberer_pour", new BotCommand.Alias(commands.get("libérer_pour")));
 		
 		commands.put("critiqué", new BotCommand.SearchCommand() {
 			
@@ -864,9 +838,7 @@ public class CritiBot implements EventListener {
 				message.getMessage().delete().queue();
 				archiver();
 				message.getChannel().sendMessage("« " + e.getNom() + " » critiqué !").queue();
-				if(!e.critique(message.getMember())) {
-					message.getAuthor().openPrivateChannel().complete().sendMessage("Vous avez indiqué avoir critiqué « " + e.getNom() + " » mais vous n'étiez pas à l'origine de la réservation. Je vous fais confiance, mais sachez que c'est pas cool.").queue();
-				}
+				e.critique();
 			}
 		});
 		
@@ -944,18 +916,6 @@ public class CritiBot implements EventListener {
 			}
 			
 		});
-	
-		commands.put("update_messages", new BotCommand() {
-
-			@Override
-			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
-				bot.updateMessages();
-				
-			}
-			
-		});
-		
-		
 		
 		commands.put("maj", new BotCommand() {
 
@@ -1018,9 +978,10 @@ public class CritiBot implements EventListener {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
-				if(e.getStatusMessage().isInitialized()) {
-					e.removeStatusMessage();
-				} else if(e.getStatus() != Status.RESERVE) {
+				for(Affichan aff : affichans) {
+					aff.up(e);
+				}
+				if(e.getStatus() != Status.RESERVE) {
 					e.setStatus(Status.OUVERT);
 				}
 				message.getChannel().sendMessage("« " + e.getNom() + " » up !").queue();
@@ -1194,15 +1155,14 @@ public class CritiBot implements EventListener {
 	
 	/**
 	 * Annule la dernière action et revient à la dernière sauvegarde.
-	 * @return
 	 */
 	public boolean annuler() {
 		if(cancel.empty()) { // Si aucune sauvegarde, pas de bol, tant pis
 			return false;
 		} else {
 			ecrits = cancel.pop(); // Sinon on la récupère en la sortant du tas et on remplace la BDD actuelle
-			for(Ecrit e : ecrits) { // Revérification de tous les messages des écrits
-				e.getStatusMessage().retrieve(jda);
+			for(Affichan aff : affichans) { // Change les références d'écrits dans tous les affichans
+				aff.updateRefs(ecrits);
 			}
 			return true;
 		}
@@ -1245,11 +1205,8 @@ public class CritiBot implements EventListener {
 
 	@Override
 	public void onEvent(GenericEvent event) {
-		if(event instanceof ReadyEvent) { // Lorsque le bot est prêt.
-			for(Ecrit e : ecrits)
-				e.check(jda); // Rechecks the messages
-			
-			// Initializes the scheduler
+		if(event instanceof ReadyEvent) { // Lorsque le bot est prêt
+			// Intitialise le shreduler pour les vérifications régulières de nouveaux fils.
 			shreduler.scheduleAtFixedRate(new Runnable() {
 
 				@Override
@@ -1269,65 +1226,26 @@ public class CritiBot implements EventListener {
 				
 			}, 10, 10, TimeUnit.MINUTES);
 			jda.getPresence().setActivity(Activity.playing("critiquer. Aucune mise à jour forum depuis le redémarrage."));
+			for(Affichan aff : affichans) {
+				try {
+					aff.initialize(this);
+				} catch (InterruptedException | ExecutionException e) {
+					e.printStackTrace();
+				}
+			}
 
 		}
-		if(event instanceof MessageReactionAddEvent) { // Traitement des réactions
+		if(event instanceof MessageDeleteEvent) {
+			for(Affichan aff : affichans) {
+				aff.checkDeletion(this, (MessageDeleteEvent) event);
+			}
+		} else if(event instanceof MessageReactionAddEvent) { // Traitement des réactions
 			MessageReactionAddEvent mrae = (MessageReactionAddEvent) event;
-			if(!mrae.getUser().isBot()) // Ne traîte pas les réactions des bots, donc ses propres réactions
-				for(Ecrit e : ecrits) { // Cherche l'écrit correspondant au message
-					if(e.getStatusMessage().isInitialized())
-						if(mrae.getMessageIdLong() == e.getStatusMessage().getMessage().getIdLong()) { // Si c'est vrai, on a enfin trouvé le bon écrit.
-							if(mrae.getReactionEmote().isEmoji()) { // Vérifie les actions pour les emojis
-								// Actions de libération de la réservation
-								if(mrae.getReactionEmote().getAsCodepoints().equals(unlock) && e.getResId() == mrae.getUserIdLong() || (e.getResId() == 0L && e.getStatus() == Status.RESERVE)) {
-									archiver();
-									e.liberer(null);
-									e.removeStatusMessage();
-								}
-							} else { // Vérifie les actions pour les emotes
-								if(mrae.getReactionEmote().getEmote().getIdLong() == henritueur && mrae.getChannel().getIdLong() == openchan) { // Réservation
-									if(e.getStatus() == Status.RESERVE && e.getResId() != mrae.getUserIdLong()) { // Essaye de réserver alors que ça l'est déjà
-										mrae.getUser().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » est déjà réservé !").queue();
-									} else {
-										archiver();
-										if(e.reserver(mrae.getMember())) { // Essaye de réserver l'écrit
-											// Si réservé, envoie le message de réservation
-											Message m = jda.getTextChannelById(organichan).sendMessage(e.toEmbed()).complete();
-											e.removeStatusMessage();
-											e.setStatusMessage(m);
-											m.addReaction(jda.getEmoteById(henricheck)).queue();
-											if(e.getType() == Type.IDEE)
-												m.addReaction(jda.getEmoteById(henricross)).queue();
-											m.addReaction(unlock).queue();
-										} else { // Sinon (ça ne devrait pas arriver), indique à l'utilisateur que ce n'est pas possible.
-											mrae.getUser().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être réservé. Il l'est peut-être déjà, ou n'a pas un statut réservable. Les écrits pouvant être réservés sont les écrits Ouverts, Abandonnés, En Pause, Validés, Sans Nouvelles ou au statut inconnu. Vous pouvez également tenter de libérer l'écrit si vous faites partie de l'Équipe Critique ou que l'écrit est réservé depuis plus de trois jours.").queue();
-										}
-									}
-								} else if(mrae.getReactionEmote().getEmote().getIdLong() == henricross && e.getType() == Type.IDEE) { // Refus d'une idée
-									archiver();
-									e.liberer(null);
-									e.setStatus(Status.REFUSE);
-									jda.getTextChannelById(organichan).sendMessage("« " + e.getNom() + " » refusé !").queue();
-									e.removeStatusMessage();
-								} else if(mrae.getReactionEmote().getEmote().getIdLong() == henricheck) { // Idée indiquée comme critiquée
-									archiver();
-									jda.getTextChannelById(organichan).sendMessage("« " + e.getNom() + " » critiqué !").queue();
-									if(!e.critique(mrae.getMember())) {
-										mrae.getUser().openPrivateChannel().complete().sendMessage("Vous avez indiqué avoir critiqué « " + e.getNom() + " » mais vous n'étiez pas à l'origine de la réservation. Je vous fais confiance, mais sachez que c'est pas cool.").queue();
-									}
-									e.removeStatusMessage();
-								} 
-							}
-							// Met à jour les messages
-							updateOpen();
-							try { // Essaye de sauvegarder
-								save();
-							} catch (IOException e1) {
-								// TODO Auto-generated catch block
-								e1.printStackTrace();
-							}
-						}
-				}
+			if(!mrae.getUser().isBot())
+				for(Affichan aff : affichans)
+					if(mrae.getChannel().getIdLong() == aff.chanID)
+						aff.reactionAdd(this, mrae);
+			
 		} else if(event instanceof MessageReceivedEvent) { // Message reçu
 			MessageReceivedEvent mre = (MessageReceivedEvent) event;
 			
