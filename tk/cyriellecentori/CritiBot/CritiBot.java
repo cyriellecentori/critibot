@@ -98,14 +98,12 @@ public class CritiBot implements EventListener {
 	 * Liste des commandes.
 	 */
 	private LinkedHashMap<String, BotCommand> commands = new LinkedHashMap<String, BotCommand>();
-	/**
-	 * Le salon « organisation » où seront placés les réservations.
-	 */
-	private final long organichan;
-	/**
-	 * Le salon « fils ouverts » où seront affichés les écrits ouverts à la critique.
-	 */
-	private final long openchan;
+	
+	private Affichan[] affichans = {
+			new Affichan(843956373103968308L, new Status[] {Status.OUVERT, Status.RESERVE}, null),
+			new Affichan(614947463610236939L, new Status[] {Status.RESERVE}, null)
+	};
+	
 	/**
 	 * L'emote de réservation.
 	 */
@@ -439,6 +437,11 @@ public class CritiBot implements EventListener {
 	 * Vérifie que tous les écrits ouverts et réservés soient présents dans leur salon dédié.
 	 */
 	public void updateOpen() {
+	
+	
+		// Attention bug lorsque le bot cherche à supprimer un message qui a été supprimé manuellement ! Génère une exception.
+		
+	
 		for(Ecrit e : sortByDate(ecrits)) {
 			// Vérification des écrits ouverts : si l'écrit est ouvert mais n'a pas de message, il faut lui créer.
 			if(e.getStatus() == Status.OUVERT && !e.getStatusMessage().isInitialized()) {
