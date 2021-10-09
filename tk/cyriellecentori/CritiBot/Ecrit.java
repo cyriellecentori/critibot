@@ -442,7 +442,7 @@ public class Ecrit implements Cloneable{
 			embed.addField("Statut", status.toString() + " par " + resName, false);
 		} else
 			embed.addField("Statut", status.toString(), false);
-		embed.setFooter("Dernière modification");
+		embed.setFooter(String.valueOf(hashCode()));
 		embed.setAuthor(auteur);
 		embed.setTimestamp(Instant.ofEpochMilli(lastUpdate));
 		switch(type) {
@@ -477,5 +477,30 @@ public class Ecrit implements Cloneable{
 		this.auteur = auteur;
 		if(this.statusMessage.isInitialized())
 			this.statusMessage.getMessage().editMessage(this.toEmbed()).queue();
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((lien == null) ? 0 : lien.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Ecrit other = (Ecrit) obj;
+		if (lien == null) {
+			if (other.lien != null)
+				return false;
+		} else if (!lien.equals(other.lien))
+			return false;
+		return true;
 	}
 }
