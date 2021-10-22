@@ -36,6 +36,10 @@ public class Affichan {
 	 */
 	private Vector<Ecrit> ecr = new Vector<Ecrit>();
 	/**
+	 * Les messages avec l'un de ces tags seront affichés.
+	 */
+	private final String[] tags;
+	/**
 	 * Les messages avec l'un de ces status seront affichés.
 	 */
 	public final Status[] status;
@@ -44,10 +48,11 @@ public class Affichan {
 	 */
 	public final Type[] types;
 	
-	public Affichan(long chanID, Status[] status, Type[] types) {
+	public Affichan(long chanID, Status[] status, Type[] types, String[] tags) {
 		this.chanID = chanID;
 		this.status = status;
 		this.types = types;
+		this.tags = tags;
 	}
 	
 	public static Ecrit searchByHash(int hash, Vector<Ecrit> ecrits) {
@@ -81,9 +86,12 @@ public class Affichan {
 			try {
 				hash = Integer.parseInt(m.getEmbeds().get(0).getFooter().getText());
 				Ecrit e = searchByHash(hash, ecrits);
-				if(e != null) {
+				if(e != null && !ecr.contains(e)) {
 					mes.add(m);
 					ecr.add(e);
+				} else if(ecr.contains(e)) {
+					System.out.println("Message en trop ! Suppression.");
+					m.delete().queue();
 				} else {
 					System.out.println("Aucun écrit correspondant au hashcode " + hash + " (nom : " + m.getEmbeds().get(0).getTitle() + ").");
 				}
@@ -128,6 +136,13 @@ public class Affichan {
 				if(!contains(types, ecr.get(i).getType())) {
 					delete = true;
 				}
+			if(tags != null) {
+				boolean hasTag = false;
+				for(String tag : tags)
+					if(ecr.get(i).hasTag(tag))
+						hasTag = true;
+				delete = delete || !hasTag;
+			}
 			if(delete) // Supprime l'écrit s'il ne correspond plus aux critères
 					toDel.add(i);
 			else if(ecr.get(i).edited){ // Sinon, vérifie s'il a été modifié
@@ -149,6 +164,15 @@ public class Affichan {
 			if(types != null)
 				if(!contains(types, e.getType()))
 					add = add && contains(types, e.getType());
+			if(tags != null) {
+				boolean hasTag = false;
+				for(String tag : tags) {
+					if(e.hasTag(tag)) {
+						hasTag = true;
+					}
+				}
+				add = add && hasTag;
+			}
 			add = add && !ecr.contains(e);
 			if(add) {
 				ecr.add(e);
@@ -214,12 +238,16 @@ public class Affichan {
 		}
 	}
 	
+	private static String checkMark = "U+2705";
+	
 	private Message sendMessage(CritiBot bot, Ecrit e) {
 		Message m = chan.sendMessage(e.toEmbed()).complete();
 		m.addReaction(bot.jda.getEmoteById(bot.henritueur)).queue();
 		m.addReaction(bot.jda.getEmoteById(bot.henricheck)).queue();
 		if(e.getType() == Type.IDEE)
 			m.addReaction(bot.jda.getEmoteById(bot.henricross)).queue();
+		if(e.getStatus() == Status.INFRACTION)
+			m.addReaction(checkMark).queue();
 		m.addReaction(bot.unlock).queue();
 		return m;
 	}
@@ -238,6 +266,9 @@ public class Affichan {
 			if(mrae.getReactionEmote().getAsCodepoints().equals(bot.unlock)) {
 				bot.archiver();
 				e.liberer(mrae.getMember());
+			} else if(mrae.getReactionEmote().getAsCodepoints().equals(checkMark) && e.getStatus() == Status.INFRACTION) {
+				bot.archiver();
+				e.setStatus(Status.OUVERT);
 			}
 		} else { // Vérifie les actions pour les emotes
 			if(mrae.getReactionEmote().getEmote().getIdLong() == bot.henritueur) { // Interêt

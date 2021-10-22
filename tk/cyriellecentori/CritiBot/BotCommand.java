@@ -102,7 +102,7 @@ public abstract class BotCommand {
 		 */
 		public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
 			try {
-				Vector<Ecrit> res = bot.search(args[0]);
+				Vector<Ecrit> res = bot.searchEcrit(args[0]);
 				if(res.size() > 1) {
 					message.getChannel().sendMessage("J'ai plus d'un résultat : il va falloir affiner le critère de recherche.").queue();
 				} else if(res.size() == 0) {

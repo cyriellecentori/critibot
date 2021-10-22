@@ -174,6 +174,11 @@ public class Ecrit implements Cloneable{
 	 */
 	public boolean edited = false;
 	
+	/*
+	 * Tableau dynamique contenant les tags associés à l'écrit.
+	 */
+	public Vector<String> tags = new Vector<String>();
+	
 	Ecrit(String nom, String lien, Type type, Status status, String auteur) {
 		this.nom = nom;
 		this.lien = lien;
@@ -200,10 +205,40 @@ public class Ecrit implements Cloneable{
 		if(status == Status.RESERVE) {
 			status = Status.OUVERT;
 		}
+		if(tags == null)
+			tags = new Vector<String>();
 	}
 	
 	public String toString() {
 		return nom + " — " + type + " — " + status + " — " + lien;
+	}
+	
+	public Vector<String> getTags() {
+		return tags;
+	}
+	
+	public boolean removeTag(String searchTag) {
+		Vector<Integer> res = CritiBot.search(searchTag, tags);
+		if(res.size() != 1)
+			return false;
+		tags.remove(res.get(0).intValue());
+		edited = true;
+		return true;
+	}
+	
+	public boolean addTag(String tag) {
+		for(int index : CritiBot.search(tag, tags)) {
+			if(tags.get(index).equals(tag)) {
+				return false;
+			}
+		}
+		tags.add(tag);
+		edited = true;
+		return true;
+	}
+	
+	public boolean hasTag(String tag) {
+		return !CritiBot.search(tag, tags).isEmpty();
 	}
 	
 	/**
@@ -216,6 +251,13 @@ public class Ecrit implements Cloneable{
 		if(!(status == Status.OUVERT || status == Status.OUVERT_PLUS))
 			return false;
 		// Remplit les informations de réservation.
+		for(Interet i : interesses) {
+			if(i instanceof InteretMembre) {
+				if(((InteretMembre) i).member == member.getIdLong()) {
+					return false;
+				}
+			}
+		}
 		Interet i = new InteretMembre(member, System.currentTimeMillis());
 		interesses.add(i);
 		status = Status.OUVERT_PLUS;
@@ -419,6 +461,13 @@ public class Ecrit implements Cloneable{
 				interesList += i.name + " le " + i.getDate() + "\n";
 			}
 			embed.addField("Marques d'intérêt", interesList, false);
+		}
+		if(!tags.isEmpty()) {
+			String total = "";
+			for(String tag : tags) {
+				total += tag + "\n";
+			}
+			embed.addField("Tags", total, false);
 		}
 		embed.setFooter(String.valueOf(hashCode()));
 		embed.setAuthor(auteur);

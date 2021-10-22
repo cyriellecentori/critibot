@@ -142,8 +142,11 @@ public class CritiBot implements EventListener {
 			henricross = 843965099986780200L;
 			organichan = 614947463610236939L;
 			affichans = new Affichan[] {
-					new Affichan(843956373103968308L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null),
-					new Affichan(614947463610236939L, new Status[] {Status.OUVERT_PLUS}, null)
+					new Affichan(843956373103968308L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null, null),
+					new Affichan(614947463610236939L, new Status[] {Status.OUVERT_PLUS}, null, null),
+					new Affichan(896361827884220467L, new Status[] {Status.INCONNU, Status.INFRACTION}, null, null),
+					new Affichan(896362452818747412L, null, new Type[] {Type.AUTRE}, null),
+					new Affichan(554998005850177556L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null, new String[] {"Concours", "Validation"})
 			};
 		} else { // Sinon, le bot est considéré comme étant en bêta et les salons sont ceux de BrainBot's lair.
 			prefix = "bc";
@@ -152,8 +155,11 @@ public class CritiBot implements EventListener {
 			henricross = 587611157158952971L;
 			organichan = 737725144390172714L;
 			affichans = new Affichan[] {
-					new Affichan(878917114474410004L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null),
-					new Affichan(737725144390172714L, new Status[] {Status.OUVERT_PLUS}, null)
+					new Affichan(878917114474410004L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null, null),
+					new Affichan(737725144390172714L, new Status[] {Status.OUVERT_PLUS}, null, null),
+					new Affichan(896361827884220467L, new Status[] {Status.INCONNU, Status.INFRACTION}, null, null),
+					new Affichan(896362452818747412L, null, new Type[] {Type.AUTRE}, null),
+					new Affichan(901072726456930365L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null, new String[] {"Concours", "Validation"})
 			};
 			System.out.println("Booting in beta.");
 		}
@@ -279,7 +285,7 @@ public class CritiBot implements EventListener {
 					}
 					// Si pas de titre propre, l'idée devient un « sans nom ».
 					if(unclean.isEmpty() || sp.length == 1) {
-						Vector<Ecrit> es = search("sans nom");
+						Vector<Ecrit> es = searchEcrit("sans nom");
 						unclean = "(sans nom " + es.size() + ")";
 						balises = entry.getTitle();
 					}
@@ -327,7 +333,7 @@ public class CritiBot implements EventListener {
 	 * @param s La chaîne à simplifier.
 	 * @return Une chaîne de caractères simple, seulement en minuscules sans diacritiques.
 	 */
-	private String basicize(String s) {
+	static private String basicize(String s) {
 		return s.toLowerCase()
 				.replaceAll("é", "e")
 				.replaceAll("ê", "e")
@@ -344,33 +350,46 @@ public class CritiBot implements EventListener {
 		
 	}
 	
-	/**
-	 * Lance une recherche parmi les écrits. Le critère doit être consituée de parties de mots du titre, majuscules et diacritiques ignorées.
-	 * @param s Le critère de recherche.
-	 * @return Une liste d'écrits correspondant au critère.
-	 */
-	public Vector<Ecrit> search(String s) {
-		Vector<Ecrit> list = new Vector<Ecrit>();
-		// Sépare les mots du critère.
+	static public Vector<Integer> search(String s, Vector<String> content) {
+		Vector<Integer> ret = new Vector<Integer>();
 		String[] motsSearch = basicize(s).split(" ");
-		for(Ecrit e : ecrits) { // Vérifie si chaque écrit respecte le critère.
-			String[] mots = basicize(e.getNom()).split(" "); // Simplifie le titre de l'écrit et sépare ses mots.
+		for(int i = 0; i < content.size(); i++) { // Vérifie si chaque chaîne de caractères respecte le critère.
+			String[] mots = basicize(content.get(i)).split(" "); // Simplifie la chaîne et sépare ses mots.
 			boolean ok = true;
-			for(String motSearch : motsSearch) { // Vérifie si un mot de l'écrit contient un mot du critère
+			for(String motSearch : motsSearch) { // Vérifie si un mot contient un mot du critère
 				boolean found = false;
 				for(String mot : mots) { 
 					if(mot.toLowerCase().contains(motSearch.toLowerCase())) {
 						found = true;
 					}
 				}
-				if(!found) { // Si un mot du critère n'est pas présent dans un mot de l'écrit, alors l'écrit ne correspond pas au critère.
+				if(!found) { // Si un mot du critère n'est pas présent dans un mot de la chaîne, alors elle ne correspond pas au critère.
 					ok = false;
 					break;
 				}
 			}
 			if(ok) {
-				list.add(e);
+				ret.add(i);
 			}
+		}
+		return ret;
+	}
+	
+	/**
+	 * Lance une recherche parmi les écrits. Le critère doit être consituée de parties de mots du titre, majuscules et diacritiques ignorées.
+	 * @param s Le critère de recherche.
+	 * @return Une liste d'écrits correspondant au critère.
+	 */
+	public Vector<Ecrit> searchEcrit(String s) {
+		Vector<Ecrit> list = new Vector<Ecrit>();
+		// Crée un tableau des noms des écrits
+		Vector<String> names = new Vector<String>();
+		for(Ecrit e : ecrits) {
+			names.add(e.getNom());
+		}
+		// Récupère les indices des écrits correspondant aux critère et les ajoute au tableau de retour
+		for(int index : search(s, names)) {
+			list.add(ecrits.get(index));
 		}
 		return list;
 	}
@@ -382,9 +401,6 @@ public class CritiBot implements EventListener {
 	 */
 	public Vector<String> autSearch(String s) {
 		Vector<String> list = new Vector<String>();
-		// Sépare les mots du critère.
-		String[] motsSearch = basicize(s).split(" ");
-		
 		// Récupère la liste de tous les auteurs de la base de données.
 		Vector<String> auteurList = new Vector<String>();
 		for(Ecrit e : ecrits) {
@@ -392,26 +408,9 @@ public class CritiBot implements EventListener {
 				auteurList.add(e.getAuteur());
 			}
 		}
-		
-		// Recherche les auteurs de la même manière que la recherche d'écrits : se référer à celle-ci pour plus de commentaires.
-		for(String a : auteurList) {
-			String[] mots = basicize(a).split(" ");
-			boolean ok = true;
-			for(String motSearch : motsSearch) {
-				boolean found = false;
-				for(String mot : mots) {
-					if(mot.toLowerCase().contains(motSearch.toLowerCase())) {
-						found = true;
-					}
-				}
-				if(!found) {
-					ok = false;
-					break;
-				}
-			}
-			if(ok) {
-				list.add(a);
-			}
+		// Ajoute les auteurs correspondant au critère dans la liste des résultats
+		for(int index : search(s, auteurList)) {
+			list.add(auteurList.get(index));
 		}
 		return list;
 	}
@@ -492,10 +491,11 @@ public class CritiBot implements EventListener {
 	 * Tri utilisé : tri fusion.
 	 */
 	public Vector<Ecrit> sortByDate(Vector<Ecrit> toSort) {
+		System.out.println(toSort.size());
 		if(toSort.size() < 2)
 			return toSort;
 		return merge(sortByDate(new Vector<Ecrit>(toSort.subList(0, toSort.size() / 2))), 
-				sortByDate(new Vector<Ecrit>(toSort.subList(toSort.size() / 2 + 1, toSort.size()))));
+				sortByDate(new Vector<Ecrit>(toSort.subList(toSort.size() / 2, toSort.size()))));
 	}
 	
 	/**
@@ -516,7 +516,7 @@ public class CritiBot implements EventListener {
 						+ "`c!inbox` : Affiche la boîte de réception, contenant les écrits qui n'ont pas pu être ajoutés automatiquement. Attention, l'appel à cette commande supprime le contenu de la boîte.", false);
 				b.addField("Commandes de recherche", "`c!rechercher {Critère}` : Affiche tous les écrits contenant {Critère}.\n"
 						+ "`c!lister {Statut};[Type]` : Affiche la liste des écrits avec le statut et du type demandés. Statut et Type peuvent prendre la valeur « Tout ».\n"
-						+ "`c!recherche_auteur {Critère de l'auteur};[Statut];[Type]` : Affiche la liste des écrits de l'auteur demandé, avec le statut et le type demandés si présents. Statut et Type peuvent prendre la valeur « Tout ». Le {Critère de l'auteur} fonctionne de la même manière que la recherche d'écrits. Il doit être également assez précis pour aboutir à un unique auteur.", false);
+						+ "`c!recherche_auteur {Critère auteur};[Statut];[Type]` : Affiche la liste des écrits de l'auteur demandé, avec le statut et le type demandés si présents. Statut et Type peuvent prendre la valeur « Tout ». Le {Critère de l'auteur} fonctionne de la même manière que la recherche d'écrits. Il doit être également assez précis pour aboutir à un unique auteur.", false);
 				b.addField("Commandes de critiques", "`c!marquer {Critère}` : Ajoute une marque d'intérêt à un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!marquer_pour {Critère};{Nom}` : Marque d'intérêt un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
 						+ "`c!libérer {Critère}` : Supprime votre marque d'intétêt sur un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
@@ -527,14 +527,25 @@ public class CritiBot implements EventListener {
 						+ "`c!type {Critère};{Type}` : Change le type de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!auteur {Critère};{Auteur}` : Change l'auteur de l'écrit demandé. Le Critère doit être assez fin pour aboutir à un unique écrit."
 						+ "`c!ouvrir {Critère}` : Raccourci pour `c!statut {Critère};Ouvert`.\n"
-						+ "`c!renommer {Critère};{Nouveau nom}` : Renomme un écrit.", false);
+						+ "`c!renommer {Critère};{Nouveau nom}` : Renomme un écrit.\n"
+						+ "`c!ajouter_tag {Critère};{Tag}` : Ajoute un tag à l'écrit.\n"
+						+ "`c!retirer_tag {Critère};{Critère tag}` : Retire un tag à l'écrit.", false);
 				b.addField("Commandes d'entretien de la base de données (À utiliser avec précaution)",
 						"`c!nettoyer` : Supprime tous les écrits abandonnés / refusés / publiés de la liste.\n"
 						+ "`c!archiver_avant {Date}` : Met le statut « sans nouvelles » à tous les écrits n'ayant pas été mis à jour avant la date indiquée. La date doit être au format dd/mm/yyyy.\n"
 						+ "`c!nettoyer_fort` : Supprime tous les écrits abandonnés / refusés / publiés / sans nouvelles de la liste.\n"
 						+ "`c!doublons` : Supprime les éventuels doublons.", false);
+				b.addField("Recherche avancée", "La recherche avancée est utilisable avec `c!ulister param;param;param;…`. Chaque paramètre est de la forme `nom=valeur`. Les différents paramètres disponibles sont :\n"
+						+ "`nom={Critère}` : Réduit la recherche aux écrits dont le nom correspond au critère.\n"
+						+ "`statut={Statut},{Statut},…` : Les écrits doivent avoir l'un des statuts de la liste.\n"
+						+ "`type={Type},{Type},…` : Les écrits doivent avoir l'un des types de la liste.\n"
+						+ "`auteur={Critère auteur},{Critère auteur},…` : Les écrits doivent être d'un des auteurs de la liste.\n"
+						+ "`tag={Critère tag},{Critère tag},…` : Les écrits doivent posséder l'un des tags de la liste.\n"
+						+ "`tag&={Critère tag},{Critère tag},…` : Les écrits doivent posséder tous les tags de la liste.\n"
+						+ "`avant=jj/mm/aaaa` : Les écrits doivent avoir été modifiés pour la dernière fois avant la date indiquée.\n"
+						+ "`après=jj/mm/aaaa` : Les écirts doivent avoir été modifiés pour la dernière fois après la date indiquée.\n", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 2.0");
+				b.setFooter("Version 2.1");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message.getChannel().sendMessage(b.build()).queue();
 			}
@@ -636,7 +647,7 @@ public class CritiBot implements EventListener {
 			@Override
 			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
 				try {
-					Vector<Ecrit> res = bot.search(args[0]); // Récupère tous les résultats de la recherche.
+					Vector<Ecrit> res = bot.searchEcrit(args[0]); // Récupère tous les résultats de la recherche.
 					if(res.isEmpty()) { // S'il n'y a aucun résultat.
 						EmbedBuilder b = new EmbedBuilder();
 						b.setTitle("Aucun résultat");
@@ -692,8 +703,10 @@ public class CritiBot implements EventListener {
 				archiver();
 				if(e.marquer(message.getMember()))
 					message.getChannel().sendMessage("« " + e.getNom() + " » marqué par " + message.getMember().getEffectiveName() + " !").queue();
-				else
+				else if(e.getStatus() != Status.OUVERT)
 					message.getChannel().sendMessage("« " + e.getNom() + " » ne peut avoir une marque d'intérêt car il n'est pas ouvert.").queue();
+				else
+					message.getChannel().sendMessage("Vous avez déjà marqué votre intérêt pour « " + e.getNom() + " ».").queue();
 			}
 		});
 
@@ -1131,6 +1144,187 @@ public class CritiBot implements EventListener {
 			
 		});
 		
+		commands.put("ulister", new BotCommand() {
+			
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				// Liste de tous les paramètres possibles
+				String critere = "";
+				Vector<Status> status = new Vector<Status>();
+				Vector<Type> type = new Vector<Type>();
+				Vector<String> authors = new Vector<String>();
+				Vector<String> tags = new Vector<String>();
+				boolean tagAnd = false;
+				long modAvant = 0;
+				long modApres = 0;
+				
+				// Récupération des paramètres
+				for(int i = 0; i < args.length; i++) {
+					String[] c = args[i].split("=");
+					if(c.length != 2) {
+						message.getChannel().sendMessage("Erreur de syntaxe dans le paramètre " + (i+1) + " : le paramètre n'est pas séparables en deux parties par un symbole « = ».").queue();
+						return;
+					}
+					String npara = basicize(c[0]);
+					if(npara.equals("critere") || npara.equals("nom")) {
+						critere = c[1];
+					} else if(npara.startsWith("statut") || npara.equals("status")) {
+						String[] st = c[1].split(",");
+						for(String s : st) {
+							status.add(Status.getStatus(s));
+						}
+						
+					} else if(npara.startsWith("type")) {
+						String[] ty = c[1].split(",");
+						for(String t : ty) {
+							type.add(Type.getType(t));
+						}
+					} else if(npara.startsWith("auteur") || npara.startsWith("autrice")) {
+						String[] aut = c[1].split(",");
+						for(String au : aut) {
+							for(String a : autSearch(au)) {
+								authors.add(a);
+							}
+						}
+					} else if(npara.startsWith("tag")) {
+						String[] ta = c[1].split(",");
+						for(String t : ta) {
+							tags.add(t);
+						}
+						tagAnd = npara.contains("&");
+					} else if(npara.equals("avant")) {
+						try {
+							modAvant = new SimpleDateFormat("dd/MM/yyyy").parse(args[0]).getTime();
+						} catch (ParseException e) {
+							message.getChannel().sendMessage("Erreur de syntaxe dans le paramètre " + (i+1) + " : la date doit être au format jj/mm/aaaa.").queue();
+							return;
+						}
+					} else if(npara.equals("apres")) {
+						try {
+							modApres = new SimpleDateFormat("dd/MM/yyyy").parse(args[0]).getTime();
+						} catch (ParseException e) {
+							message.getChannel().sendMessage("Erreur de syntaxe dans le paramètre " + (i+1) + " : la date doit être au format jj/mm/aaaa.").queue();
+							return;
+						}
+					} else {
+						message.getChannel().sendMessage("Erreur de syntaxe dans le paramètre " + (i+1) + " : paramètre « " + c[0] + " » inconnu.").queue();
+						return;
+					}
+				}
+				
+				Vector<Ecrit> candidats = new Vector<Ecrit>();
+				if(critere.isEmpty()) {
+					candidats = ecrits;
+				} else {
+					candidats = searchEcrit(critere);
+				}
+				Vector<Ecrit> choisis = new Vector<Ecrit>();
+				for(Ecrit e : candidats) {
+					boolean ok = true;
+					if(!status.isEmpty())
+						ok = ok && status.contains(e.getStatus());
+					if(!type.isEmpty())
+						ok = ok && type.contains(e.getType());
+					if(!authors.isEmpty())
+						ok = ok && authors.contains(e.getAuteur());
+					if(!tags.isEmpty()) {
+						boolean okTag = tagAnd;
+						for(String tag : tags) {
+							if(tagAnd) {
+								okTag = okTag && e.hasTag(tag);
+							} else {
+								okTag = okTag || e.hasTag(tag);
+							}
+						}
+						ok = ok && okTag;
+					}
+					if(modAvant != 0) {
+						ok = ok && (e.getLastUpdateLong() < modAvant);
+					}
+					if(modApres != 0) {
+						ok = ok && (e.getLastUpdateLong() > modApres);
+					}
+					if(ok) {
+						choisis.add(e);
+					}
+				}
+				
+				// Vector des messages à envoyer.
+				Vector<MessageEmbed> embeds = new Vector<MessageEmbed>();
+				// Vector du contenu des embeds.
+				Vector<String> messages = new Vector<String>();
+				// Sépare les résultats de la recherche pour que chaque message n'excède pas les 2 000 caractères.
+				String buffer = "";
+				for(Ecrit e : sortByDate(choisis)) {
+					// Remplit d'abord un buffer puis lorsqu'il est trop grand, ajoute son contenu dans « messages » et le vide.
+					String toAdd = "[**" + e.getNom() + "**](" + e.getLien() + ")\n" + e.getAuteur() + "\n" + e.getStatus() + " — " + e.getType() + "\n\n";
+					if(buffer.length() + toAdd.length() > 2000) {
+						messages.add(buffer);
+						buffer = "";
+					}
+					buffer += toAdd;
+				}
+				if(buffer.isEmpty()) { // Si le buffer est vide, c'est qu'il n'a jamais été rempli : aucun résultat, donc.
+					EmbedBuilder b = new EmbedBuilder();
+					b.setTitle("Aucun résultat");
+					b.setAuthor("Recherche personnalisée");
+					b.setTimestamp(Instant.now());
+					b.setColor(16001600);
+					message.getChannel().sendMessage(b.build()).queue();
+				} else { // Sinon, envoie les résultats.
+					messages.add(buffer); // Ajoute le buffer restant aux messages.
+					EmbedBuilder b = new EmbedBuilder();
+					b.setTitle("Résultats de la recherche");
+					b.setAuthor("Recherche personnalisée");
+					b.setTimestamp(Instant.now());
+					b.setColor(73887);
+					for(int i = 0; i < messages.size(); i++) { // Crée les différents messages à envoyer en numérotant les pages.
+						b.setFooter("Page " + (i + 1) + "/" + messages.size());
+						b.setDescription(messages.get(i));
+						embeds.add(b.build());
+					}
+					
+					for(MessageEmbed embed : embeds) { // Envoie les messages.
+						message.getChannel().sendMessage(embed).queue();
+					}
+				}
+			}
+		});
+		
+		commands.put("ul", new BotCommand.Alias(commands.get("ulister")));
+		
+		commands.put("ajouter_tag", new BotCommand.SearchCommand() {
+			
+			@Override
+			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
+				if(e.addTag(args[1])) {
+					message.getChannel().sendMessage("Tag « " + args[1] + " » ajouté à l'écrit « " + e.getNom() + " ».").queue();
+				} else {
+					message.getChannel().sendMessage("Ce tag est déjà ajouté à l'écrit « " + e.getNom() + " ».").queue();
+				}
+			}
+		});
+		
+		commands.put("atag", new BotCommand.Alias(commands.get("ajouter_tag")));
+		
+		commands.put("retirer_tag", new BotCommand.SearchCommand() {
+			
+			@Override
+			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				archiver();
+				if(e.removeTag(args[1])) {
+					message.getChannel().sendMessage("Tag correspondant au critère retiré de l'écrit « " + e.getNom() + " ».").queue();
+				} else {
+					message.getChannel().sendMessage("Aucun tag correspondant au critère n'est assigné à l'écrit « " + e.getNom() + " », ou plus d'un tag de l'écrit correspondent au critère.").queue();
+				}
+				
+			}
+		});
+		
+		commands.put("supprimer_tag", new BotCommand.Alias(commands.get("retirer_tag")));
+		commands.put("rtag", new BotCommand.Alias(commands.get("retirer_tag")));
+		commands.put("stag", new BotCommand.Alias(commands.get("retirer_tag")));
 	}
 	
 	/**
