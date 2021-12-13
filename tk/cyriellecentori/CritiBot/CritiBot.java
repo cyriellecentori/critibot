@@ -1367,16 +1367,22 @@ public class CritiBot implements EventListener {
 					Vector<Ecrit> ecritsMaj = new Vector<Ecrit>();
 					Vector<String> neo = new Vector<String>();
 					SyndFeed feed = new SyndFeedInput().build(new XmlReader(new URL("http://fondationscp.wikidot.com/feed/forum/cp-656675.xml")));
-					for(Object e : feed.getEntries()) {
-						SyndEntry entry = (SyndEntry) e;
+					for(Object o : feed.getEntries()) {
+						SyndEntry entry = (SyndEntry) o;
 						if(entry.getPublishedDate().after(new Date(date))) {
-							String url = entry.getLink().split("#")[0];
-							int hash = url.hashCode() + 31;
-							Ecrit ecr = Affichan.searchByHash(hash, ecrits);
+							String threadID = entry.getLink().substring(7).split("/")[2];
+							Ecrit ecr = null;
+							for(Ecrit e : ecrits) {
+								String eID = e.getLien().substring(7).split("/")[2];
+								if(threadID.equals(eID)) {
+									ecr = e;
+									break;
+								}
+							}
 							if(ecr != null && !ecritsMaj.contains(ecr)) {
 								ecritsMaj.add(ecr);
-							} else if(!neo.contains(url) && ecr == null) {
-								neo.add(url);
+							} else if(!neo.contains(entry.getLink()) && ecr == null) {
+								neo.add(entry.getLink());
 							}
 						}
 					}
