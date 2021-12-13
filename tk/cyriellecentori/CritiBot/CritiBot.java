@@ -1181,10 +1181,23 @@ public class CritiBot implements EventListener {
 						}
 					} else if(npara.startsWith("auteur") || npara.startsWith("autrice")) {
 						String[] aut = c[1].split(",");
+						String errMes = "";
+						boolean quit = false;
 						for(String au : aut) {
-							for(String a : autSearch(au)) {
-								authors.add(a);
-							}
+							Vector<String> found = autSearch(au);
+							if(!found.isEmpty())
+								for(String a : found) {
+									authors.add(a);
+								}
+							else
+								errMes += "Auteur « " + au + " » non trouvé.\n";
+						}
+						if(aut.length != 0 && authors.isEmpty()) {
+							errMes += "Aucun auteur de la liste trouvé ; annulation.";
+						}
+						if(errMes != "") {
+							message.getChannel().sendMessage(errMes).queue();
+							return;
 						}
 					} else if(npara.startsWith("tag")) {
 						String[] ta = c[1].split(",");
