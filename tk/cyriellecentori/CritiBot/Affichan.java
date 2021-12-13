@@ -128,20 +128,23 @@ public class Affichan {
 		Vector<Integer> toDel = new Vector<Integer>();
 		for(int i = 0; i < mes.size(); i++) {
 			boolean delete = false;
-			if(status != null)
+			if(!ecrits.contains(ecr.get(i))) { // Si l’écrit a été supprimé
+				delete = true;
+			}
+			if(status != null && !delete)
 				if(!contains(status, ecr.get(i).getStatus())) {
 					delete = true;
 				}
-			if(types != null)
+			if(types != null && !delete)
 				if(!contains(types, ecr.get(i).getType())) {
 					delete = true;
 				}
-			if(tags != null) {
+			if(tags != null && !delete) {
 				boolean hasTag = false;
 				for(String tag : tags)
 					if(ecr.get(i).hasTag(tag))
 						hasTag = true;
-				delete = delete || !hasTag;
+				delete = !hasTag;
 			}
 			if(delete) // Supprime l'écrit s'il ne correspond plus aux critères
 					toDel.add(i);

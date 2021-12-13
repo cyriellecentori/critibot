@@ -491,7 +491,6 @@ public class CritiBot implements EventListener {
 	 * Tri utilisé : tri fusion.
 	 */
 	public Vector<Ecrit> sortByDate(Vector<Ecrit> toSort) {
-		System.out.println(toSort.size());
 		if(toSort.size() < 2)
 			return toSort;
 		return merge(sortByDate(new Vector<Ecrit>(toSort.subList(0, toSort.size() / 2))), 
@@ -545,7 +544,7 @@ public class CritiBot implements EventListener {
 						+ "`avant=jj/mm/aaaa` : Les écrits doivent avoir été modifiés pour la dernière fois avant la date indiquée.\n"
 						+ "`après=jj/mm/aaaa` : Les écirts doivent avoir été modifiés pour la dernière fois après la date indiquée.\n", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 2.1");
+				b.setFooter("Version 2.2");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message.getChannel().sendMessage(b.build()).queue();
 			}
@@ -1338,6 +1337,103 @@ public class CritiBot implements EventListener {
 		commands.put("supprimer_tag", new BotCommand.Alias(commands.get("retirer_tag")));
 		commands.put("rtag", new BotCommand.Alias(commands.get("retirer_tag")));
 		commands.put("stag", new BotCommand.Alias(commands.get("retirer_tag")));
+		
+		commands.put("hash", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				if(args.length > 0)
+					message.getChannel().sendMessage("" + args[0].hashCode()).queue();
+				
+			}
+			
+		});
+		
+		commands.put("updates_from", new BotCommand() {
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				if(args.length == 0) {
+					message.getChannel().sendMessage("Utilisation : c!updates_from jj/mm/aaaa").queue();
+					return;
+				}
+				long date = 0L;
+				try {
+					date = new SimpleDateFormat("dd/MM/yyyy").parse(args[0]).getTime();
+				} catch (ParseException e) {
+					message.getChannel().sendMessage("Utilisation : c!updates_from jj/mm/aaaa").queue();
+					return;
+				}
+				try {
+					Vector<Ecrit> ecritsMaj = new Vector<Ecrit>();
+					Vector<String> neo = new Vector<String>();
+					SyndFeed feed = new SyndFeedInput().build(new XmlReader(new URL("http://fondationscp.wikidot.com/feed/forum/cp-656675.xml")));
+					for(Object e : feed.getEntries()) {
+						SyndEntry entry = (SyndEntry) e;
+						if(entry.getPublishedDate().after(new Date(date))) {
+							String url = entry.getLink().split("#")[0];
+							int hash = url.hashCode() + 31;
+							Ecrit ecr = Affichan.searchByHash(hash, ecrits);
+							if(ecr != null && !ecritsMaj.contains(ecr)) {
+								ecritsMaj.add(ecr);
+							} else if(!neo.contains(url) && ecr == null) {
+								neo.add(url);
+							}
+						}
+					}
+					// Vector des messages à envoyer.
+					Vector<MessageEmbed> embeds = new Vector<MessageEmbed>();
+					// Vector du contenu des embeds.
+					Vector<String> messages = new Vector<String>();
+					// Sépare les résultats de la recherche pour que chaque message n'excède pas les 2 000 caractères.
+					String buffer = "";
+					for(Ecrit e : sortByDate(ecritsMaj)) {
+						// Remplit d'abord un buffer puis lorsqu'il est trop grand, ajoute son contenu dans « messages » et le vide.
+						String toAdd = "[**" + e.getNom() + "**](" + e.getLien() + ")\n" + e.getAuteur() + "\n" + e.getStatus() + " — " + e.getType() + "\n\n";
+						if(buffer.length() + toAdd.length() > 2000) {
+							messages.add(buffer);
+							buffer = "";
+						}
+						buffer += toAdd;
+					}
+					
+					for(String str : neo) {
+						String toAdd = str + "\n\n";
+						if(buffer.length() + toAdd.length() > 2000) {
+							messages.add(buffer);
+							buffer = "";
+						}
+						buffer += toAdd;
+					}
+					if(buffer.isEmpty()) { // Si le buffer est vide, c'est qu'il n'a jamais été rempli : aucun résultat, donc.
+						EmbedBuilder b = new EmbedBuilder();
+						b.setTitle("Aucun résultat");
+						b.setAuthor("Écrits mis à jour depuis le " + args[0]);
+						b.setTimestamp(Instant.now());
+						b.setColor(16001600);
+						message.getChannel().sendMessage(b.build()).queue();
+					} else { // Sinon, envoie les résultats.
+						messages.add(buffer); // Ajoute le buffer restant aux messages.
+						EmbedBuilder b = new EmbedBuilder();
+						b.setTitle("Résultats de la recherche");
+						b.setAuthor("Écrits mis à jour depuis le " + args[0]);
+						b.setTimestamp(Instant.now());
+						b.setColor(73887);
+						for(int i = 0; i < messages.size(); i++) { // Crée les différents messages à envoyer en numérotant les pages.
+							b.setFooter("Page " + (i + 1) + "/" + messages.size());
+							b.setDescription(messages.get(i));
+							embeds.add(b.build());
+						}
+						
+						for(MessageEmbed embed : embeds) { // Envoie les messages.
+							message.getChannel().sendMessage(embed).queue();
+						}
+					}
+				} catch (IllegalArgumentException | FeedException | IOException e) {
+					message.getChannel().sendMessage("Erreur lors de la récupération du flux.").queue();
+				}
+				
+			}
+		});
 	}
 	
 	/**
