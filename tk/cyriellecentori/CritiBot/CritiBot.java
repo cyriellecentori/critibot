@@ -108,11 +108,11 @@ public class CritiBot implements EventListener {
 	/**
 	 * L'emote indiquant l'écrit comme critiqué.
 	 */
-	public final long henricheck;
+	public final String henricheck = "U+1f4e8";
 	/**
 	 * L'emote indiquant l'écrit comme refusé.
 	 */
-	public final long henricross;
+	public final String henricross = "U+274c";
 	//private final String whiteCheckBox = "U+2705";
 	/**
 	 * L'emoji cadenas ouvert.
@@ -137,9 +137,7 @@ public class CritiBot implements EventListener {
 		this.token = token;
 		if(token.hashCode() == 1973164890) { // Si le bot est connecté à l'utilisateur Critibot#8684, les salons sont ceux du discord des Critiqueurs.
 			prefix = "c";
-			henritueur = 817064076244418610L;
-			henricheck = 843965097428516864L;
-			henricross = 843965099986780200L;
+			henritueur = 844249814799351838L;
 			organichan = 614947463610236939L;
 			affichans = new Affichan[] {
 					new Affichan(843956373103968308L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null, null),
@@ -151,8 +149,6 @@ public class CritiBot implements EventListener {
 		} else { // Sinon, le bot est considéré comme étant en bêta et les salons sont ceux de BrainBot's lair.
 			prefix = "bc";
 			henritueur = 470138432723877888L;
-			henricheck = 470138433185120256L;
-			henricross = 587611157158952971L;
 			organichan = 737725144390172714L;
 			affichans = new Affichan[] {
 					new Affichan(878917114474410004L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null, null),

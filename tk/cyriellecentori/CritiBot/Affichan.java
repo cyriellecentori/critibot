@@ -228,27 +228,14 @@ public class Affichan {
 		}
 	}
 	
-	/**
-	 * Met à jour les références vers les écrits lorsqu'une modification a été annulée.
-	 * 
-	 * Puisque l'annulation remplace la base de donnnées par une copie antérieure de celle-ci,
-	 * tous les écrits mis dans les vecteurs des affichans sont des références vers les écrits annulés.
-	 * Cette méthode remplace les références annulées par les nouvelles.
-	 */
-	public void updateRefs(Vector<Ecrit> ecrits) {
-		for(Ecrit e : ecr) {
-			e = searchByHash(e.hashCode(), ecrits);
-		}
-	}
-	
 	private static String checkMark = "U+2705";
 	
 	private Message sendMessage(CritiBot bot, Ecrit e) {
 		Message m = chan.sendMessage(e.toEmbed()).complete();
 		m.addReaction(bot.jda.getEmoteById(bot.henritueur)).queue();
-		m.addReaction(bot.jda.getEmoteById(bot.henricheck)).queue();
+		m.addReaction(bot.henricheck).queue();
 		if(e.getType() == Type.IDEE)
-			m.addReaction(bot.jda.getEmoteById(bot.henricross)).queue();
+			m.addReaction(bot.henricross).queue();
 		if(e.getStatus() == Status.INFRACTION)
 			m.addReaction(checkMark).queue();
 		m.addReaction(bot.unlock).queue();
@@ -272,19 +259,19 @@ public class Affichan {
 			} else if(mrae.getReactionEmote().getAsCodepoints().equals(checkMark) && e.getStatus() == Status.INFRACTION) {
 				bot.archiver();
 				e.setStatus(Status.OUVERT);
-			}
+			} else if(mrae.getReactionEmote().getAsCodepoints().equals(bot.henricross) && e.getType() == Type.IDEE) { // Refus d'une idée
+				bot.archiver();
+				e.setStatus(Status.REFUSE);
+				bot.jda.getTextChannelById(bot.organichan).sendMessage("« " + e.getNom() + " » refusé !").queue();
+			} else if(mrae.getReactionEmote().getAsCodepoints().equals(bot.henricheck)) { // Idée indiquée comme critiquée
+				bot.archiver();
+				bot.jda.getTextChannelById(bot.organichan).sendMessage("« " + e.getNom() + " » critiqué !").queue();
+				e.critique();
+			} 
 		} else { // Vérifie les actions pour les emotes
 			if(mrae.getReactionEmote().getEmote().getIdLong() == bot.henritueur) { // Interêt
 				bot.archiver();
 				e.marquer(mrae.getMember());
-			} else if(mrae.getReactionEmote().getEmote().getIdLong() == bot.henricross && e.getType() == Type.IDEE) { // Refus d'une idée
-				bot.archiver();
-				e.setStatus(Status.REFUSE);
-				bot.jda.getTextChannelById(bot.organichan).sendMessage("« " + e.getNom() + " » refusé !").queue();
-			} else if(mrae.getReactionEmote().getEmote().getIdLong() == bot.henricheck) { // Idée indiquée comme critiquée
-				bot.archiver();
-				bot.jda.getTextChannelById(bot.organichan).sendMessage("« " + e.getNom() + " » critiqué !").queue();
-				e.critique();
 			} 
 		}
 		// Met à jour les messages
@@ -294,6 +281,30 @@ public class Affichan {
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
+		}
+	}
+	
+	/**
+	 * Met à jour les références vers les écrits lorsqu'une modification a été annulée.
+	 * 
+	 * Puisque l'annulation remplace la base de donnnées par une copie antérieure de celle-ci,
+	 * tous les écrits mis dans les vecteurs des affichans sont des références vers les écrits annulés.
+	 * Cette méthode remplace les références annulées par les nouvelles.
+	 */
+	public void updateRefs(Vector<Ecrit> ecrits) {
+		Vector<Integer> toDel = new Vector<Integer>();
+		for(int i  = 0; i < this.ecr.size(); i++) {
+			Ecrit newPointer = Affichan.searchByHash(ecr.get(i).hashCode(), ecrits);
+			if(newPointer == null)
+				toDel.add(i);
+			else
+				ecr.set(i, newPointer);
+		}
+		for(int i = toDel.size() - 1; i >= 0; i--) {
+			ecr.remove((int) toDel.get(i));
+			Message mmm = mes.get((int) toDel.get(i));
+			mes.remove((int) toDel.get(i));
+			mmm.delete().queue();
 		}
 	}
 	
