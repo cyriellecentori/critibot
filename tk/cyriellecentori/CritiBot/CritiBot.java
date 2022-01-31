@@ -511,7 +511,7 @@ public class CritiBot implements EventListener {
 						+ "`c!inbox` : Affiche la boîte de réception, contenant les écrits qui n'ont pas pu être ajoutés automatiquement. Attention, l'appel à cette commande supprime le contenu de la boîte.", false);
 				b.addField("Commandes de recherche", "`c!rechercher {Critère}` : Affiche tous les écrits contenant {Critère}.\n"
 						+ "`c!lister {Statut};[Type]` : Affiche la liste des écrits avec le statut et du type demandés. Statut et Type peuvent prendre la valeur « Tout ».\n"
-						+ "`c!recherche_auteur {Critère auteur};[Statut];[Type]` : Affiche la liste des écrits de l'auteur demandé, avec le statut et le type demandés si présents. Statut et Type peuvent prendre la valeur « Tout ». Le {Critère de l'auteur} fonctionne de la même manière que la recherche d'écrits. Il doit être également assez précis pour aboutir à un unique auteur.", false);
+						+ "`c!lister_tags` : Affiche tous les tags existants dans la base de données et le nombre d'écrits y étant associés", false);
 				b.addField("Commandes de critiques", "`c!marquer {Critère}` : Ajoute une marque d'intérêt à un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`c!marquer_pour {Critère};{Nom}` : Marque d'intérêt un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
 						+ "`c!libérer {Critère}` : Supprime votre marque d'intétêt sur un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
@@ -540,7 +540,7 @@ public class CritiBot implements EventListener {
 						+ "`avant=jj/mm/aaaa` : Les écrits doivent avoir été modifiés pour la dernière fois avant la date indiquée.\n"
 						+ "`après=jj/mm/aaaa` : Les écirts doivent avoir été modifiés pour la dernière fois après la date indiquée.\n", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 2.2");
+				b.setFooter("Version 2.3");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message.getChannel().sendMessage(b.build()).queue();
 			}
@@ -1047,89 +1047,6 @@ public class CritiBot implements EventListener {
 			
 		});
 		
-		commands.put("recherche_auteur", new BotCommand() {
-
-			@Override
-			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
-				try {
-					Vector<String> aut = bot.autSearch(args[0]); // Récupère tous les auteurs correspondants au critère.
-					if(aut.isEmpty()) { // Si aucun auteur n'est dans la liste.
-						message.getChannel().sendMessage("Aucun auteur correspondant trouvé.").queue();
-					} else if(aut.size() > 1) { // Si trop d'auteurs sont dans la liste.
-						message.getChannel().sendMessage("Plusieurs auteurs trouvés : affinez votre critère.").queue();
-					} else { // Sinon, affiche tous leurs écrits.
-						Vector<Ecrit> res = new Vector<Ecrit>();
-						Ecrit.Status statut = null;
-						if(args.length > 1) { // Paramètre optionnel du statut.
-							if(args[1] != "Tout")
-								statut = Status.getStatus(args[1]);
-						}
-						Type type = null;
-						if(args.length > 2) { // Paramètre optionnel du type.
-							if(args[2] != "Tout")
-								type = Type.getType(args[2]);
-						}
-						
-						for(Ecrit e : ecrits) { // Récupère les écrits qui
-							boolean ok = (e.getAuteur().equals(aut.get(0))); // sont de cet auteur
-							if(statut != null) { // sont du statut recherché si demandé
-								ok = ok && (e.getStatus() == statut);
-							}
-							if(type != null) { // sont du type recherché si demandé
-								ok = ok && (e.getType() == type);
-							}
-							if(ok) {
-								res.add(e);
-							}
-						}
-						if(res.isEmpty()) { // Si aucun écrit ne correspond à la recherche.
-							EmbedBuilder b = new EmbedBuilder();
-							b.setTitle("Aucun résultat");
-							b.setAuthor("Recherche : " + args[0] + " – " + (statut == null ? "Tout" : statut) + " — " + (type == null ? "Tout" : type));
-							b.setTimestamp(Instant.now());
-							b.setColor(16001600);
-							message.getChannel().sendMessage(b.build()).queue();
-						} else { // Si des écrits sont trouvés, ils sont listés de la même manière qu'avec c!lister (voir cette commande pour plus de commentaires).
-							Vector<MessageEmbed> embeds = new Vector<MessageEmbed>();
-							Vector<String> messages = new Vector<String>();
-							String buffer = "";
-							for(Ecrit e : res) {
-								String toAdd = "[**" + e.getNom() + "**](" + e.getLien() + ")\n" + e.getStatus() + " — " + e.getType() + "\n" + "Dernière modification : " + e.getLastUpdate() + "\n\n";
-								if(buffer.length() + toAdd.length() > 2000) {
-									messages.add(buffer);
-									buffer = "";
-								}
-								buffer += toAdd;
-							}
-							messages.add(buffer);
-							EmbedBuilder b = new EmbedBuilder();
-							b.setTitle("Liste des écrits de " + aut.get(0));
-							b.setAuthor("Recherche : " + args[0] + " – " + (statut == null ? "Tout" : statut) + " — " + (type == null ? "Tout" : type));
-							b.setTimestamp(Instant.now());
-							b.setColor(73887);
-							for(int i = 0; i < messages.size(); i++) {
-								b.setFooter("Page " + (i + 1) + "/" + messages.size());
-								b.setDescription(messages.get(i));
-								embeds.add(b.build());
-
-								for(MessageEmbed embed : embeds) {
-									message.getChannel().sendMessage(embed).queue();
-								}
-							}
-						}
-					}
-				} catch(ArrayIndexOutOfBoundsException e) {
-					message.getChannel().sendMessage("Utilisation : `c!recherche_auteur {Critère de l'auteur};[Statut];[Type]`").queue();
-				} catch(NullPointerException e) {
-					e.printStackTrace();
-					message.getChannel().sendMessage("Erreur.").queue();
-				}
-			}
-			
-		});
-		
-		commands.put("ra", new BotCommand.Alias(commands.get("recherche_auteur")));
-		
 		commands.put("taille_bdd", new BotCommand() {
 
 			@Override
@@ -1333,6 +1250,68 @@ public class CritiBot implements EventListener {
 		commands.put("supprimer_tag", new BotCommand.Alias(commands.get("retirer_tag")));
 		commands.put("rtag", new BotCommand.Alias(commands.get("retirer_tag")));
 		commands.put("stag", new BotCommand.Alias(commands.get("retirer_tag")));
+		
+		commands.put("lister_tags", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				Vector<String> tags = new Vector<String>();
+				Vector<Integer> nbEcrits = new Vector<Integer>();
+				for(Ecrit e : bot.ecrits) {
+					for(String tag : e.getTags()) {
+						int index = tags.indexOf(tag);
+						if(index < 0) {
+							index = tags.size();
+							tags.add(tag);
+							nbEcrits.add(0);
+						}
+						nbEcrits.set(index, nbEcrits.get(index) + 1);
+					}
+				}
+				
+				// Vector des messages à envoyer.
+				Vector<MessageEmbed> embeds = new Vector<MessageEmbed>();
+				// Vector du contenu des embeds.
+				Vector<String> messages = new Vector<String>();
+				// Sépare les résultats de la recherche pour que chaque message n'excède pas les 2 000 caractères.
+				String buffer = "";
+				for(int i = 0; i < tags.size(); i++) {
+					// Remplit d'abord un buffer puis lorsqu'il est trop grand, ajoute son contenu dans « messages » et le vide.
+					String toAdd = "**" + tags.get(i) + "**\n" + nbEcrits.get(i).toString() + " écrits\n\n";
+					if(buffer.length() + toAdd.length() > 2000) {
+						messages.add(buffer);
+						buffer = "";
+					}
+					buffer += toAdd;
+				}
+				if(buffer.isEmpty()) { // Si le buffer est vide, c'est qu'il n'a jamais été rempli : aucun résultat, donc.
+					EmbedBuilder b = new EmbedBuilder();
+					b.setTitle("Aucun tag dans la base de données");
+					b.setAuthor("Liste des tags");
+					b.setTimestamp(Instant.now());
+					b.setColor(16001600);
+					message.getChannel().sendMessage(b.build()).queue();
+				} else { // Sinon, envoie les résultats.
+					messages.add(buffer); // Ajoute le buffer restant aux messages.
+					EmbedBuilder b = new EmbedBuilder();
+					b.setTitle("Liste des tags");
+					b.setAuthor("Liste des tags");
+					b.setTimestamp(Instant.now());
+					b.setColor(73887);
+					for(int i = 0; i < messages.size(); i++) { // Crée les différents messages à envoyer en numérotant les pages.
+						b.setFooter("Page " + (i + 1) + "/" + messages.size());
+						b.setDescription(messages.get(i));
+						embeds.add(b.build());
+					}
+					
+					for(MessageEmbed embed : embeds) { // Envoie les messages.
+						message.getChannel().sendMessage(embed).queue();
+					}
+				}
+				
+			}
+			
+		});
 		
 		commands.put("hash", new BotCommand() {
 
