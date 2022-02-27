@@ -72,6 +72,7 @@ public class Affichan {
 		
 		chan = bot.jda.getTextChannelById(chanID);
 		if(chan == null) {
+			System.err.println("Erreur : salon d'identifiant " + chanID + " non trouvé.");
 			return false;
 		}
 		// Récupération des messages du bot contenant des embeds
@@ -149,7 +150,7 @@ public class Affichan {
 			if(delete) // Supprime l'écrit s'il ne correspond plus aux critères
 					toDel.add(i);
 			else if(ecr.get(i).edited){ // Sinon, vérifie s'il a été modifié
-				mes.get(i).editMessage(ecr.get(i).toEmbed()).queue();
+				mes.get(i).editMessageEmbeds(ecr.get(i).toEmbed()).queue();
 			}
 		}
 		for(int i = toDel.size() - 1; i >= 0; i--) {
@@ -231,7 +232,7 @@ public class Affichan {
 	private static String checkMark = "U+2705";
 	
 	private Message sendMessage(CritiBot bot, Ecrit e) {
-		Message m = chan.sendMessage(e.toEmbed()).complete();
+		Message m = chan.sendMessageEmbeds(e.toEmbed()).complete();
 		m.addReaction(bot.jda.getEmoteById(bot.henritueur)).queue();
 		m.addReaction(bot.henricheck).queue();
 		if(e.getType() == Type.IDEE)

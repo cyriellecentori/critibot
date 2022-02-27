@@ -38,13 +38,13 @@ import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.ReadyEvent;
 import net.dv8tion.jda.api.events.message.MessageDeleteEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.EventListener;
-import tk.cyriellecentori.CritiBot.BotCommand.Alias;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -60,6 +60,7 @@ public class CritiBot implements EventListener {
 			System.err.println("Merci d'indiquer le token du bot en paramètre.");
 			return;
 		}
+		@SuppressWarnings("unused")
 		CritiBot cb = new CritiBot(args[0]);
 
 	}
@@ -342,7 +343,11 @@ public class CritiBot implements EventListener {
 				.replaceAll("î", "i")
 				.replaceAll("œ", "oe")
 				.replaceAll("æ", "ae")
-				.replaceAll("û", "u");
+				.replaceAll("û", "u")
+				.strip()
+				.replaceAll("ä", "a")
+				.replaceAll("ö", "o")
+				.replaceAll("â", "a");
 		
 	}
 	
@@ -425,6 +430,20 @@ public class CritiBot implements EventListener {
 		// Supprime les écrits à supprimer.
 		for(Ecrit e : toRem) {
 			ecrits.remove(e);
+		}
+	}
+	
+	public void sendEmbeds(MessageChannel chan, Vector<MessageEmbed> embeds) {
+		Vector<MessageEmbed> bufferEmbed = new Vector<MessageEmbed>();
+		for(MessageEmbed embed : embeds) { // Envoie les messages.
+			bufferEmbed.add(embed);
+			if(bufferEmbed.size() == 10) {
+				chan.sendMessageEmbeds(bufferEmbed).queue();
+				bufferEmbed.clear();
+			}
+		}
+		if(bufferEmbed.size() != 10) {
+			chan.sendMessageEmbeds(bufferEmbed).queue();
 		}
 	}
 	
@@ -540,9 +559,9 @@ public class CritiBot implements EventListener {
 						+ "`avant=jj/mm/aaaa` : Les écrits doivent avoir été modifiés pour la dernière fois avant la date indiquée.\n"
 						+ "`après=jj/mm/aaaa` : Les écirts doivent avoir été modifiés pour la dernière fois après la date indiquée.\n", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 2.3");
+				b.setFooter("Version 2.3.1");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
-				message.getChannel().sendMessage(b.build()).queue();
+				message.getChannel().sendMessageEmbeds(b.build()).queue();
 			}
 		});
 		
@@ -600,7 +619,7 @@ public class CritiBot implements EventListener {
 						b.setAuthor("Recherche : " + ((status == null) ? "Tous statuts" : status) + " — " + ((type == null) ? "Tous types" : type));
 						b.setTimestamp(Instant.now());
 						b.setColor(16001600);
-						message.getChannel().sendMessage(b.build()).queue();
+						message.getChannel().sendMessageEmbeds(b.build()).queue();
 					} else { // Sinon, envoie les résultats.
 						messages.add(buffer); // Ajoute le buffer restant aux messages.
 						EmbedBuilder b = new EmbedBuilder();
@@ -613,10 +632,7 @@ public class CritiBot implements EventListener {
 							b.setDescription(messages.get(i));
 							embeds.add(b.build());
 						}
-						
-						for(MessageEmbed embed : embeds) { // Envoie les messages.
-							message.getChannel().sendMessage(embed).queue();
-						}
+						sendEmbeds(message.getChannel(), embeds);
 					}
 					
 				} catch(ArrayIndexOutOfBoundsException e) {
@@ -649,11 +665,13 @@ public class CritiBot implements EventListener {
 						b.setAuthor("Recherche : " + args[0]);
 						b.setTimestamp(Instant.now());
 						b.setColor(16001600);
-						message.getChannel().sendMessage(b.build()).queue();
+						message.getChannel().sendMessageEmbeds(b.build()).queue();
 					} else if(res.size() <= 3) { // Si trois résultats ou moins, afficher les trois écrits en grand.
-						for(Ecrit e : res) {
-							message.getChannel().sendMessage(e.toEmbed()).queue();
+						Vector<MessageEmbed> bufferEmbed = new Vector<MessageEmbed>();
+						for(Ecrit e : res) { // Envoie les messages.
+							bufferEmbed.add(e.toEmbed());
 						}
+						message.getChannel().sendMessageEmbeds(bufferEmbed).queue();
 					} else { // Sinon, afficher une liste similaire à celle de c!lister. Voir cette commande pour plus de commentaires.
 						Vector<MessageEmbed> embeds = new Vector<MessageEmbed>();
 						Vector<String> messages = new Vector<String>();
@@ -676,11 +694,9 @@ public class CritiBot implements EventListener {
 							b.setFooter("Page " + (i + 1) + "/" + messages.size());
 							b.setDescription(messages.get(i));
 							embeds.add(b.build());
-
-							for(MessageEmbed embed : embeds) {
-								message.getChannel().sendMessage(embed).queue();
-							}
 						}
+						
+						sendEmbeds(message.getChannel(), embeds);
 					}
 				} catch(ArrayIndexOutOfBoundsException e) {
 					message.getChannel().sendMessage("Rechercher… Quoi exactement ?").queue();
@@ -1094,7 +1110,6 @@ public class CritiBot implements EventListener {
 					} else if(npara.startsWith("auteur") || npara.startsWith("autrice")) {
 						String[] aut = c[1].split(",");
 						String errMes = "";
-						boolean quit = false;
 						for(String au : aut) {
 							Vector<String> found = autSearch(au);
 							if(!found.isEmpty())
@@ -1195,7 +1210,7 @@ public class CritiBot implements EventListener {
 					b.setAuthor("Recherche personnalisée");
 					b.setTimestamp(Instant.now());
 					b.setColor(16001600);
-					message.getChannel().sendMessage(b.build()).queue();
+					message.getChannel().sendMessageEmbeds(b.build()).queue();
 				} else { // Sinon, envoie les résultats.
 					messages.add(buffer); // Ajoute le buffer restant aux messages.
 					EmbedBuilder b = new EmbedBuilder();
@@ -1209,9 +1224,8 @@ public class CritiBot implements EventListener {
 						embeds.add(b.build());
 					}
 					
-					for(MessageEmbed embed : embeds) { // Envoie les messages.
-						message.getChannel().sendMessage(embed).queue();
-					}
+					sendEmbeds(message.getChannel(), embeds);
+					
 				}
 			}
 		});
@@ -1290,7 +1304,7 @@ public class CritiBot implements EventListener {
 					b.setAuthor("Liste des tags");
 					b.setTimestamp(Instant.now());
 					b.setColor(16001600);
-					message.getChannel().sendMessage(b.build()).queue();
+					message.getChannel().sendMessageEmbeds(b.build()).queue();
 				} else { // Sinon, envoie les résultats.
 					messages.add(buffer); // Ajoute le buffer restant aux messages.
 					EmbedBuilder b = new EmbedBuilder();
@@ -1304,9 +1318,7 @@ public class CritiBot implements EventListener {
 						embeds.add(b.build());
 					}
 					
-					for(MessageEmbed embed : embeds) { // Envoie les messages.
-						message.getChannel().sendMessage(embed).queue();
-					}
+					sendEmbeds(message.getChannel(), embeds);
 				}
 				
 			}
@@ -1391,7 +1403,7 @@ public class CritiBot implements EventListener {
 						b.setAuthor("Écrits mis à jour depuis le " + args[0]);
 						b.setTimestamp(Instant.now());
 						b.setColor(16001600);
-						message.getChannel().sendMessage(b.build()).queue();
+						message.getChannel().sendMessageEmbeds(b.build()).queue();
 					} else { // Sinon, envoie les résultats.
 						messages.add(buffer); // Ajoute le buffer restant aux messages.
 						EmbedBuilder b = new EmbedBuilder();
@@ -1405,9 +1417,7 @@ public class CritiBot implements EventListener {
 							embeds.add(b.build());
 						}
 						
-						for(MessageEmbed embed : embeds) { // Envoie les messages.
-							message.getChannel().sendMessage(embed).queue();
-						}
+						sendEmbeds(message.getChannel(), embeds);
 					}
 				} catch (IllegalArgumentException | FeedException | IOException e) {
 					message.getChannel().sendMessage("Erreur lors de la récupération du flux.").queue();

@@ -54,7 +54,8 @@ public class Ecrit implements Cloneable{
 		/**
 		 * Renvoie le Statut correspondant à la chaîne de caractère transmise.
 		 */
-		public static Status getStatus(String str) {
+		public static Status getStatus(String rawStr) {
+			String str = rawStr.strip();
 			if(str.equalsIgnoreCase(OUVERT.nom)) {
 				return OUVERT;
 			} else if(str.equalsIgnoreCase(EN_ATTENTE.nom)) {
