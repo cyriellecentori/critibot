@@ -161,25 +161,12 @@ public class CritiBot implements EventListener {
 			System.out.println("Booting in beta.");
 		}
 		
-		// Initialisation de l'API
-		try {
-
-			builder = JDABuilder.createDefault(this.token)
-					.addEventListeners(this);
-
-			jda = builder.build();
-		} catch(LoginException | IllegalArgumentException e) {
-			e.printStackTrace();
-			return;
-		}
-		jda.setAutoReconnect(true);
-		
 		// Initialisation du moteur JSON
 		GsonBuilder gsonBilder = new GsonBuilder();
 		gsonBilder.setPrettyPrinting(); // Histoire d'avoir un beau JSON
 
 		gson =gsonBilder.create();
-		
+
 		// Lecture de la base de données
 		String data = "";
 		BufferedReader dataFile;
@@ -192,15 +179,15 @@ public class CritiBot implements EventListener {
 			}
 
 			dataFile.close();
-			
+
 		} catch (IOException exp) {
 			exp.printStackTrace();
 			System.out.println("Impossible d'ouvrir les données, de nouvelles seront crées à la prochaine sauvegarde.");
 			ecrits = new Vector<Ecrit>();
 		}
-		
+
 		TypeToken<Vector<Ecrit>> ttve = new TypeToken<Vector<Ecrit>>() {};
-		
+
 		// À la fin du fichier se trouve normalement la date de la dernière recherche de mise à jour des flux RSS
 		try {
 			lastCheck = Long.parseLong(data.split("θ")[1]);
@@ -208,41 +195,56 @@ public class CritiBot implements EventListener {
 		} catch(Exception e) { // Si ce n'est pas le cas, tant pis
 			ecrits = gson.fromJson(data, ttve.getType());
 		}
-		
-		
-		
+
+
+
 		// S'il y a une erreur dans l'initialisation des données, éviter les NullPointerException
 		if(ecrits == null)
 			ecrits = new Vector<Ecrit>();
-		
+
 		// Vérification que tous les écrits sont bien, toujours pour éviter les NullPointerException
 		for(Ecrit e : ecrits) {
 			e.check();
 		}
-		
+
 		// Bout de code qui supprime un nombre aléatoire d'écrits de la BDD (50% en moyenne).
 		/*Vector<Ecrit> nouveau = new Vector<Ecrit>();
-		java.util.Random r = new java.util.Random();
-		for(Ecrit e : ecrits) {
-			if(r.nextBoolean()) {
-				nouveau.add(e);
-			}
-		}
-		ecrits = nouveau;
-		try {
-			save();
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		System.exit(0);*/
-		
+				java.util.Random r = new java.util.Random();
+				for(Ecrit e : ecrits) {
+					if(r.nextBoolean()) {
+						nouveau.add(e);
+					}
+				}
+				ecrits = nouveau;
+				try {
+					save();
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+				System.exit(0);*/
+
 		initCommands();
-		
+
 		lastUpdate = System.currentTimeMillis();
 
+		// Initialisation de l'API
+		try {
+
+			builder = JDABuilder.createDefault(this.token)
+					.addEventListeners(this);
+
+			jda = builder.build();
+		} catch(LoginException | IllegalArgumentException e) {
+			e.printStackTrace();
+			return;
+		}
+		jda.setAutoReconnect(true);
+
+
+
 	}
-	
+
 	/**
 	 * Met à jour la BDD avec les flux RSS.
 	 * @throws IllegalArgumentException
@@ -559,7 +561,7 @@ public class CritiBot implements EventListener {
 						+ "`avant=jj/mm/aaaa` : Les écrits doivent avoir été modifiés pour la dernière fois avant la date indiquée.\n"
 						+ "`après=jj/mm/aaaa` : Les écirts doivent avoir été modifiés pour la dernière fois après la date indiquée.\n", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 2.3.1");
+				b.setFooter("Version 2.3.2");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message.getChannel().sendMessageEmbeds(b.build()).queue();
 			}
@@ -714,7 +716,7 @@ public class CritiBot implements EventListener {
 				archiver();
 				if(e.marquer(message.getMember()))
 					message.getChannel().sendMessage("« " + e.getNom() + " » marqué par " + message.getMember().getEffectiveName() + " !").queue();
-				else if(e.getStatus() != Status.OUVERT)
+				else if(e.getStatus() != Status.OUVERT_PLUS)
 					message.getChannel().sendMessage("« " + e.getNom() + " » ne peut avoir une marque d'intérêt car il n'est pas ouvert.").queue();
 				else
 					message.getChannel().sendMessage("Vous avez déjà marqué votre intérêt pour « " + e.getNom() + " ».").queue();
