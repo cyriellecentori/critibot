@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.Random;
 import java.util.Stack;
 import java.util.Vector;
 import java.util.concurrent.ExecutionException;
@@ -45,6 +46,7 @@ import net.dv8tion.jda.api.events.message.MessageDeleteEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.EventListener;
+import tk.cyriellecentori.CritiBot.BotCommand.Alias;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -64,6 +66,8 @@ public class CritiBot implements EventListener {
 		CritiBot cb = new CritiBot(args[0]);
 
 	}
+	
+	public static Random random = new Random();
 	
 	/**
 	 * Date de la dernière vérification des flux RSS.
@@ -353,6 +357,12 @@ public class CritiBot implements EventListener {
 		
 	}
 	
+	/**
+	 * Recherche les chaînes de caratères correspondant au critère dans le vecteur donné.
+	 * @param s critère
+	 * @param content vecteur à chercher
+	 * @return Un vecteur contenant les identifiant dans le vecteur content des chaînes de caratère correspondant au critère.
+	 */
 	static public Vector<Integer> search(String s, Vector<String> content) {
 		Vector<Integer> ret = new Vector<Integer>();
 		String[] motsSearch = basicize(s).split(" ");
@@ -376,6 +386,58 @@ public class CritiBot implements EventListener {
 			}
 		}
 		return ret;
+	}
+	
+	/**
+	 * Recherche les écrits avec de nombreux critères.
+	 * @param critere Le critère sur le titre ("" pour indifférent)
+	 * @param status Liste des status recherchés (vide pour indifférent)
+	 * @param type Liste des types recherchés (vide pour indifférent)
+	 * @param authors Liste des auteurs recherchés (vide pour indifférent)
+	 * @param tags Liste des tags recherchés (vide pour indifférent)
+	 * @param tagAnd Si l'écrit doit avoir l'un des tags ou tous les tags
+	 * @param modAvant Date de plus récente modification (0 pour indifférent)
+	 * @param modApres Date de plus ancienne modification (0 pour indifférent)
+	 * @return Un vecteur des écrits correspondant aux critères.
+	 */
+	public Vector<Ecrit> ulister(String critere, Vector<Status> status, Vector<Type> type, Vector<String> authors, Vector<String> tags, boolean tagAnd, long modAvant, long modApres) {
+		Vector<Ecrit> candidats = new Vector<Ecrit>();
+		if(critere.isEmpty()) {
+			candidats = ecrits;
+		} else {
+			candidats = searchEcrit(critere);
+		}
+		Vector<Ecrit> choisis = new Vector<Ecrit>();
+		for(Ecrit e : candidats) {
+			boolean ok = true;
+			if(!status.isEmpty())
+				ok = ok && status.contains(e.getStatus());
+			if(!type.isEmpty())
+				ok = ok && type.contains(e.getType());
+			if(!authors.isEmpty())
+				ok = ok && authors.contains(e.getAuteur());
+			if(!tags.isEmpty()) {
+				boolean okTag = tagAnd;
+				for(String tag : tags) {
+					if(tagAnd) {
+						okTag = okTag && e.hasTag(tag);
+					} else {
+						okTag = okTag || e.hasTag(tag);
+					}
+				}
+				ok = ok && okTag;
+			}
+			if(modAvant != 0) {
+				ok = ok && (e.getLastUpdateLong() < modAvant);
+			}
+			if(modApres != 0) {
+				ok = ok && (e.getLastUpdateLong() > modApres);
+			}
+			if(ok) {
+				choisis.add(e);
+			}
+		}
+		return choisis;
 	}
 	
 	/**
@@ -551,6 +613,9 @@ public class CritiBot implements EventListener {
 						+ "`c!archiver_avant {Date}` : Met le statut « sans nouvelles » à tous les écrits n'ayant pas été mis à jour avant la date indiquée. La date doit être au format dd/mm/yyyy.\n"
 						+ "`c!nettoyer_fort` : Supprime tous les écrits abandonnés / refusés / publiés / sans nouvelles de la liste.\n"
 						+ "`c!doublons` : Supprime les éventuels doublons.", false);
+				b.addField("Commandes de choix d'écrit",
+						"`c!aléatoire [Type1];[Type2];…` : Choisit un écrit ouvert aléatoire de l'un des types donnés en paramètre. Si aucun argument n'est donné, chosit un écrit ouvert aléatoire sans distinction de type.\n"
+						+ "`c!ancien [Type1];[Type2];…` : Choisit l'écrit le plus anciennement modifié encore ouvert parmi tous les écrits des types données en paramètre. Si aucun argument n'est donné, choisit l'écrit encore ouvert le plus ancien sans distinction de type.", false);
 				b.addField("Recherche avancée", "La recherche avancée est utilisable avec `c!ulister param;param;param;…`. Chaque paramètre est de la forme `nom=valeur`. Les différents paramètres disponibles sont :\n"
 						+ "`nom={Critère}` : Réduit la recherche aux écrits dont le nom correspond au critère.\n"
 						+ "`statut={Statut},{Statut},…` : Les écrits doivent avoir l'un des statuts de la liste.\n"
@@ -561,11 +626,13 @@ public class CritiBot implements EventListener {
 						+ "`avant=jj/mm/aaaa` : Les écrits doivent avoir été modifiés pour la dernière fois avant la date indiquée.\n"
 						+ "`après=jj/mm/aaaa` : Les écirts doivent avoir été modifiés pour la dernière fois après la date indiquée.\n", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 2.3.2");
+				b.setFooter("Version 2.4");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message.getChannel().sendMessageEmbeds(b.build()).queue();
 			}
 		});
+		
+		commands.put("help", new BotCommand.Alias(commands.get("aide")));
 		
 		commands.put("ajouter", new BotCommand() {
 
@@ -1154,42 +1221,7 @@ public class CritiBot implements EventListener {
 					}
 				}
 				
-				Vector<Ecrit> candidats = new Vector<Ecrit>();
-				if(critere.isEmpty()) {
-					candidats = ecrits;
-				} else {
-					candidats = searchEcrit(critere);
-				}
-				Vector<Ecrit> choisis = new Vector<Ecrit>();
-				for(Ecrit e : candidats) {
-					boolean ok = true;
-					if(!status.isEmpty())
-						ok = ok && status.contains(e.getStatus());
-					if(!type.isEmpty())
-						ok = ok && type.contains(e.getType());
-					if(!authors.isEmpty())
-						ok = ok && authors.contains(e.getAuteur());
-					if(!tags.isEmpty()) {
-						boolean okTag = tagAnd;
-						for(String tag : tags) {
-							if(tagAnd) {
-								okTag = okTag && e.hasTag(tag);
-							} else {
-								okTag = okTag || e.hasTag(tag);
-							}
-						}
-						ok = ok && okTag;
-					}
-					if(modAvant != 0) {
-						ok = ok && (e.getLastUpdateLong() < modAvant);
-					}
-					if(modApres != 0) {
-						ok = ok && (e.getLastUpdateLong() > modApres);
-					}
-					if(ok) {
-						choisis.add(e);
-					}
-				}
+				Vector<Ecrit> choisis = ulister(critere, status, type, authors, tags, tagAnd, modAvant, modApres);
 				
 				// Vector des messages à envoyer.
 				Vector<MessageEmbed> embeds = new Vector<MessageEmbed>();
@@ -1338,7 +1370,7 @@ public class CritiBot implements EventListener {
 			
 		});
 		
-		commands.put("updates_from", new BotCommand() {
+		commands.put("majs_depuis", new BotCommand() {
 			@Override
 			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
 				if(args.length == 0) {
@@ -1427,6 +1459,57 @@ public class CritiBot implements EventListener {
 				
 			}
 		});
+		
+		commands.put("updates_from", new BotCommand.Alias(commands.get("majs_depuis")));
+		
+		commands.put("aléatoire", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				Vector<Type> t = new Vector<Type>();
+				if(args.length > 0) {
+					for(String tstr : args) {
+						t.add(Type.getType(tstr));
+					}
+				}
+				Vector<Status> s = new Vector<Status>();
+				s.add(Status.OUVERT);
+				Vector<Ecrit> correspondants = ulister("", s, t, new Vector<String>(), new Vector<String>(), false, 0, 0);
+				if(correspondants.size() == 0)
+					message.getChannel().sendMessage("Aucun écrit possible trouvé.").queue();
+				else {
+					Ecrit choisi = correspondants.get(random.nextInt(correspondants.size()));
+					message.getChannel().sendMessageEmbeds(choisi.toEmbed()).queue();
+				}
+			}
+			
+		});
+		
+		commands.put("random", new BotCommand.Alias(commands.get("aléatoire")));
+		commands.put("r", new BotCommand.Alias(commands.get("aléatoire")));
+		
+		commands.put("ancien", new BotCommand() {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				Vector<Type> t = new Vector<Type>();
+				for(String tstr : args) {
+					t.add(Type.getType(tstr));
+				}
+				Vector<Status> s = new Vector<Status>();
+				s.add(Status.OUVERT);
+				Vector<Ecrit> correspondants = ulister("", s, t, new Vector<String>(), new Vector<String>(), false, 0, 0);
+				if(correspondants.size() == 0)
+					message.getChannel().sendMessage("Aucun écrit possible trouvé.").queue();
+				else {
+					Ecrit choisi = sortByDate(correspondants).get(0);
+					message.getChannel().sendMessageEmbeds(choisi.toEmbed()).queue();
+				}
+			}
+			
+		});
+		
+		commands.put("a", new BotCommand.Alias(commands.get("ancien")));
 	}
 	
 	/**
@@ -1568,7 +1651,11 @@ public class CritiBot implements EventListener {
 			
 			// Essaye d'executer la commande demandée
 			try {
-				commands.get(command).execute(this, mre, args.split(";"));
+				String[] str = args.split(";");
+				if(str.length == 1 && str[0] == "") {
+					str = new String[0];
+				}
+				commands.get(command).execute(this, mre, str);
 			} catch(NullPointerException e) { // Si elle n'est pas trouvée, c'est qu'elle est inconnue.
 				chan.sendMessage("Commande inconnue.").queue();
 			}

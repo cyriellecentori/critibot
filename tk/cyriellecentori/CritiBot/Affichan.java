@@ -98,8 +98,7 @@ public class Affichan {
 				}
 				
 			} catch(NumberFormatException e) {
-				System.out.println("Message " + m.getEmbeds().get(0).getTitle() + " trop ancien.");
-				m.delete().queue();
+				System.out.println("Message " + m.getEmbeds().get(0).getTitle() + " n'est pas correct.");
 			} catch(NullPointerException e) {
 				
 			}
