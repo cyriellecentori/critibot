@@ -42,10 +42,13 @@ import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.TextChannel;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.ReadyEvent;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageDeleteEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.hooks.EventListener;
+import net.dv8tion.jda.api.interactions.InteractionHook;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import tk.cyriellecentori.CritiBot.BotCommand.Alias;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
@@ -158,9 +161,9 @@ public class CritiBot implements EventListener {
 			affichans = new Affichan[] {
 					new Affichan(878917114474410004L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null, null),
 					new Affichan(737725144390172714L, new Status[] {Status.OUVERT_PLUS}, null, null),
-					new Affichan(896361827884220467L, new Status[] {Status.INCONNU, Status.INFRACTION}, null, null),
-					new Affichan(896362452818747412L, null, new Type[] {Type.AUTRE}, null),
-					new Affichan(901072726456930365L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null, new String[] {"Concours", "Validation"})
+					//new Affichan(896361827884220467L, new Status[] {Status.INCONNU, Status.INFRACTION}, null, null),
+					//new Affichan(896362452818747412L, null, new Type[] {Type.AUTRE}, null),
+					//new Affichan(901072726456930365L, new Status[] {Status.OUVERT, Status.OUVERT_PLUS}, null, new String[] {"Concours", "Validation"})
 			};
 			System.out.println("Booting in beta.");
 		}
@@ -736,11 +739,9 @@ public class CritiBot implements EventListener {
 						b.setColor(16001600);
 						message.getChannel().sendMessageEmbeds(b.build()).queue();
 					} else if(res.size() <= 3) { // Si trois résultats ou moins, afficher les trois écrits en grand.
-						Vector<MessageEmbed> bufferEmbed = new Vector<MessageEmbed>();
 						for(Ecrit e : res) { // Envoie les messages.
-							bufferEmbed.add(e.toEmbed());
+							Affichan.sendMessageWithActions(e, message.getTextChannel()).queue();
 						}
-						message.getChannel().sendMessageEmbeds(bufferEmbed).queue();
 					} else { // Sinon, afficher une liste similaire à celle de c!lister. Voir cette commande pour plus de commentaires.
 						Vector<MessageEmbed> embeds = new Vector<MessageEmbed>();
 						Vector<String> messages = new Vector<String>();
@@ -1387,15 +1388,16 @@ public class CritiBot implements EventListener {
 				try {
 					Vector<Ecrit> ecritsMaj = new Vector<Ecrit>();
 					Vector<String> neo = new Vector<String>();
+					// Récupère le flux
 					SyndFeed feed = new SyndFeedInput().build(new XmlReader(new URL("http://fondationscp.wikidot.com/feed/forum/cp-656675.xml")));
-					for(Object o : feed.getEntries()) {
+					for(Object o : feed.getEntries()) { // Pour chaque entrée
 						SyndEntry entry = (SyndEntry) o;
-						if(entry.getPublishedDate().after(new Date(date))) {
-							String threadID = entry.getLink().substring(7).split("/")[2];
+						if(entry.getPublishedDate().after(new Date(date))) { // Ne prend que les entrées plus récentes que la date indiquée
+							int threadID = Ecrit.fIDtoInt(entry.getLink().substring(7).split("/")[2]); // Récupère l’ID du thread
 							Ecrit ecr = null;
-							for(Ecrit e : ecrits) {
-								String eID = e.getLien().substring(7).split("/")[2];
-								if(threadID.equals(eID)) {
+							for(Ecrit e : ecrits) { // Recherche l’écrit avec le même ID de thread
+								int eID = e.hashCode();
+								if(threadID == eID) { // Identifie l’écrit trouvé à la mise à jour
 									ecr = e;
 									break;
 								}
@@ -1479,7 +1481,7 @@ public class CritiBot implements EventListener {
 					message.getChannel().sendMessage("Aucun écrit possible trouvé.").queue();
 				else {
 					Ecrit choisi = correspondants.get(random.nextInt(correspondants.size()));
-					message.getChannel().sendMessageEmbeds(choisi.toEmbed()).queue();
+					Affichan.sendMessageWithActions(choisi, message.getTextChannel()).queue();
 				}
 			}
 			
@@ -1503,7 +1505,7 @@ public class CritiBot implements EventListener {
 					message.getChannel().sendMessage("Aucun écrit possible trouvé.").queue();
 				else {
 					Ecrit choisi = sortByDate(correspondants).get(0);
-					message.getChannel().sendMessageEmbeds(choisi.toEmbed()).queue();
+					Affichan.sendMessageWithActions(choisi, message.getTextChannel()).queue();
 				}
 			}
 			
@@ -1618,13 +1620,41 @@ public class CritiBot implements EventListener {
 			for(Affichan aff : affichans) {
 				aff.checkDeletion(this, (MessageDeleteEvent) event);
 			}
-		} else if(event instanceof MessageReactionAddEvent) { // Traitement des réactions
-			MessageReactionAddEvent mrae = (MessageReactionAddEvent) event;
-			if(!mrae.getUser().isBot())
-				for(Affichan aff : affichans)
-					if(mrae.getChannel().getIdLong() == aff.chanID)
-						aff.reactionAdd(this, mrae);
-			
+		} else if(event instanceof ButtonInteractionEvent) {
+			ButtonInteractionEvent bie = (ButtonInteractionEvent) event;
+			if(bie.getButton().getId().startsWith("e")) {
+				int id = Integer.parseInt(bie.getButton().getId().split("-")[1]);
+				Ecrit e = Affichan.searchByHash(id, ecrits);
+				if(e == null) {
+					System.err.println("Attention : bouton ne correspondant à aucun écrit.");
+					bie.editComponents(bie.getMessage().getActionRows().get(0).asDisabled()).queue();
+				} else {
+					if(bie.getButton().getId().endsWith("m")) {
+						archiver();
+						e.marquer(bie.getMember());
+					} else if(bie.getButton().getId().endsWith("c")) {
+						archiver();
+						jda.getTextChannelById(organichan).sendMessage("« " + e.getNom() + " » critiqué !").queue();
+						e.critique();
+					} else if(bie.getButton().getId().endsWith("r")) {
+						archiver();
+						e.setStatus(Status.REFUSE);
+						jda.getTextChannelById(organichan).sendMessage("« " + e.getNom() + " » refusé !").queue();
+					} else if(bie.getButton().getId().endsWith("d")) {
+						archiver();
+						e.liberer(bie.getMember());
+					}
+					bie.editMessageEmbeds(e.toEmbed()).queue();
+					updateOpen();
+					try { // Essaye de sauvegarder
+						save();
+					} catch (IOException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
+				}
+				
+			}
 		} else if(event instanceof MessageReceivedEvent) { // Message reçu
 			MessageReceivedEvent mre = (MessageReceivedEvent) event;
 			

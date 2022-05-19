@@ -9,8 +9,13 @@ import java.util.stream.Collectors;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.TextChannel;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageDeleteEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
+import net.dv8tion.jda.api.interactions.components.ActionRow;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import net.dv8tion.jda.api.requests.RestAction;
+import net.dv8tion.jda.api.requests.restaction.MessageAction;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -149,7 +154,8 @@ public class Affichan {
 			if(delete) // Supprime l'écrit s'il ne correspond plus aux critères
 					toDel.add(i);
 			else if(ecr.get(i).edited){ // Sinon, vérifie s'il a été modifié
-				mes.get(i).editMessageEmbeds(ecr.get(i).toEmbed()).queue();
+				mes.get(i).editMessageEmbeds(ecr.get(i).toEmbed()).queue(); // Met à jour l’embed
+				mes.get(i).editMessageComponents(ActionRow.of(getActionRow(ecr.get(i)))).queue(); // Met à jour les boutons
 			}
 		}
 		for(int i = toDel.size() - 1; i >= 0; i--) {
@@ -230,58 +236,42 @@ public class Affichan {
 	
 	private static String checkMark = "U+2705";
 	
-	private Message sendMessage(CritiBot bot, Ecrit e) {
-		Message m = chan.sendMessageEmbeds(e.toEmbed()).complete();
-		m.addReaction(bot.jda.getEmoteById(bot.henritueur)).queue();
-		m.addReaction(bot.henricheck).queue();
-		if(e.getType() == Type.IDEE)
-			m.addReaction(bot.henricross).queue();
-		if(e.getStatus() == Status.INFRACTION)
-			m.addReaction(checkMark).queue();
-		m.addReaction(bot.unlock).queue();
-		return m;
+	/*
+	 * Retourne les boutons appropriés pour un écrit.
+	 */
+	public static Vector<Button> getActionRow(Ecrit e) {
+		Button marque = Button.primary("e" + e.forumID() + "-m", "Marquer");
+		Button critique = Button.success("e" + e.forumID() + "-c", "Critiqué");
+		Button refus = Button.danger("e" + e.forumID() + "-r", "Refusé");
+		Button retirer = Button.secondary("e" + e.forumID() + "-d", "Retirer marque");
+		Button up = Button.success("e" + e.forumID() + "-u", "Up");
+		Vector<Button> buttons = new Vector<Button>();
+		
+		if(e.getStatus() == Status.OUVERT || e.getStatus() == Status.OUVERT_PLUS) {
+			buttons.add(marque);
+			buttons.add(critique);
+		}
+		if(e.getStatus() == Status.INFRACTION || e.getStatus() == Status.EN_ATTENTE || e.getStatus() == Status.SANS_NOUVELLES) {
+			buttons.add(up);
+		}
+		if((e.getType() == Type.RAPPORT || e.getType() == Type.IDEE) && e.getStatus() != Status.REFUSE) {
+			buttons.add(refus);
+		}
+		if(e.getStatus() == Status.OUVERT || e.getStatus() == Status.OUVERT_PLUS) {
+			buttons.add(retirer);
+		}
+		return buttons;
 	}
 	
-	public void reactionAdd(CritiBot bot, MessageReactionAddEvent mrae) {
-		Ecrit e = null;
-		for(int i = 0; i < mes.size(); i++) { // Cherche l'écrit correspondant au message
-			if(mes.get(i).getIdLong() == mrae.getMessageIdLong())
-				e = ecr.get(i);
-		}
-		if(e == null)
-			return;
-		
-		if(mrae.getReactionEmote().isEmoji()) { // Vérifie les actions pour les emojis
-			// Actions de libération de la réservation
-			if(mrae.getReactionEmote().getAsCodepoints().equals(bot.unlock)) {
-				bot.archiver();
-				e.liberer(mrae.getMember());
-			} else if(mrae.getReactionEmote().getAsCodepoints().equals(checkMark) && e.getStatus() == Status.INFRACTION) {
-				bot.archiver();
-				e.setStatus(Status.OUVERT);
-			} else if(mrae.getReactionEmote().getAsCodepoints().equals(bot.henricross) && e.getType() == Type.IDEE) { // Refus d'une idée
-				bot.archiver();
-				e.setStatus(Status.REFUSE);
-				bot.jda.getTextChannelById(bot.organichan).sendMessage("« " + e.getNom() + " » refusé !").queue();
-			} else if(mrae.getReactionEmote().getAsCodepoints().equals(bot.henricheck)) { // Idée indiquée comme critiquée
-				bot.archiver();
-				bot.jda.getTextChannelById(bot.organichan).sendMessage("« " + e.getNom() + " » critiqué !").queue();
-				e.critique();
-			} 
-		} else { // Vérifie les actions pour les emotes
-			if(mrae.getReactionEmote().getEmote().getIdLong() == bot.henritueur) { // Interêt
-				bot.archiver();
-				e.marquer(mrae.getMember());
-			} 
-		}
-		// Met à jour les messages
-		bot.updateOpen();
-		try { // Essaye de sauvegarder
-			bot.save();
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
+	/*
+	 * Crée une action à compléter envoyant un message de description de l’écrit avec les boutons appropriés.
+	 */
+	public static MessageAction sendMessageWithActions(Ecrit e, TextChannel chan) {
+		return chan.sendMessageEmbeds(e.toEmbed()).setActionRow(getActionRow(e));
+	}
+	
+	private Message sendMessage(CritiBot bot, Ecrit e) {
+		return sendMessageWithActions(e, chan).complete();
 	}
 	
 	/**

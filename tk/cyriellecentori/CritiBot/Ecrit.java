@@ -506,12 +506,20 @@ public class Ecrit implements Cloneable{
 		edited = true;
 	}
 
+	
+	
+	public String forumID() {
+		return lien.substring(7).split("/")[2];
+	}
+	
+	// Retourne une version int de l’indentifiant forum
+	public static int fIDtoInt(String id) {
+		return Integer.parseInt(id.substring(2));
+	}
+	
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((lien == null) ? 0 : lien.hashCode());
-		return result;
+		return fIDtoInt(forumID());
 	}
 
 	@Override
