@@ -3,8 +3,12 @@ package tk.cyriellecentori.CritiBot;
 
 import java.util.Vector;
 
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.MessageChannel;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 
 /**
  * Décrit une commande du bot.
@@ -12,8 +16,22 @@ import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
  *
  */
 public abstract class BotCommand {
+
+	public String name;
+	public OptionData[] options;
+	
+	public BotCommand(CritiBot bot, String name, String desc, OptionData... options) {
+		this.name = name;
+		this.options = options;
+		JDA jda = bot.jda;
+		if(!bot.beta) {
+			//jda.getGuildById(372635468786827265L).upsertCommand(name, desc).addOptions(options).queue();
+		} else
+			jda.getGuildById(372635468786827265L).upsertCommand(name, desc).addOptions(options).queue();
+	}
 	
 	public BotCommand() {
+		
 	}
 	
 	/**
@@ -23,6 +41,11 @@ public abstract class BotCommand {
 	 * @param args Les arguments de la commande.
 	 */
 	public abstract void execute(CritiBot bot, MessageReceivedEvent message, String[] args);
+	
+	/*
+	 * Décrit l’action de la commande lorsqu’elle est executée par une commande slash.
+	 */
+	public abstract void slash(CritiBot bot, SlashCommandInteractionEvent event);
 	
 	/**
 	 * Permet d'envoyer un message en plusieurs parties si celui-ci dépasse les 2 000 caractères.
@@ -58,6 +81,11 @@ public abstract class BotCommand {
 		 * 
 		 * @param target La commande pointée
 		 */
+		public Alias(CritiBot bot, String name, BotCommand target) {
+			super(bot, name, "Alias pour /" + target.name, target.options);
+			this.target = target;
+		}
+		
 		public Alias(BotCommand target) {
 			super();
 			this.target = target;
@@ -69,6 +97,11 @@ public abstract class BotCommand {
 		@Override
 		public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
 			target.execute(bot, message, args);
+		}
+
+		@Override
+		public void slash(CritiBot bot, SlashCommandInteractionEvent event) {
+			target.slash(bot, event);
 		}
 		
 		
@@ -83,8 +116,11 @@ public abstract class BotCommand {
 	 */
 	public static abstract class SearchCommand extends BotCommand {
 		
-		public SearchCommand() {
-			super();
+		/**
+		 * Ne pas oublier de donner une option avec l’identifiant « ecrit » dans les options.
+		 */
+		public SearchCommand(CritiBot bot, String name, String desc, OptionData... options) {
+			super(bot, name, desc, options);
 		}
 		
 		/**
@@ -95,6 +131,14 @@ public abstract class BotCommand {
 		 * @param args Les arguments de la commande.
 		 */
 		public abstract void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args);
+		
+		/**
+		 * Exécute la commande avec l'écrit recherché.
+		 * @param e L'écrit recherché.
+		 * @param bot Une référence vers l'objet Critibot.
+		 * @param event La commande slash ayant lancé la commande
+		 */
+		public abstract void processSlash(Ecrit e, CritiBot bot, SlashCommandInteractionEvent event);
 		
 		/**
 		 * Récupère l'écrit demandé et l'envoie à process. Si plusieurs résultats ou aucun se sont trouvés,
@@ -114,5 +158,37 @@ public abstract class BotCommand {
 				message.getChannel().sendMessage("Mauvais usage de la commande.").queue();
 			}
 		}
+		
+		public void slash(CritiBot bot, SlashCommandInteractionEvent event) {
+			OptionMapping id = event.getOption("recherche-id");
+			boolean id_search = (id == null) ? false : id.getAsBoolean();
+			
+			if(id_search) {
+				try {
+					Ecrit e = Affichan.searchByHash(Integer.parseInt(id.getAsString()), bot.getEcrits());
+					if(e == null)
+						event.reply("Cet écrit n’existe pas.").queue();
+					else
+						processSlash(e, bot, event);
+				} catch(NumberFormatException e) {
+					event.reply("Vous avez sélectionné la recherche par ID mais il est impossible de reconnaître un nombre.").queue();
+				}
+			} else {
+					Vector<Ecrit> res;
+					try {
+						res = bot.searchEcrit(event.getOption("ecrit").getAsString());
+					} catch(NullPointerException e) {
+						event.reply("Cette commande doit être appelée avec l’argument « id » ou l’argument « ecrit », aucun des deux n’a été fourni.").queue();
+						return;
+					}
+					if(res.size() > 1)
+						event.reply("J'ai plus d'un résultat : il va falloir affiner le critère de recherche ou utiliser l’identifiant.").queue();
+					else if(res.size() == 0)
+						event.reply("Aucun résultat trouvé.").queue();
+					else
+						processSlash(res.firstElement(), bot, event);
+			}
+		}
+		
 	}
 }

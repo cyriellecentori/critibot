@@ -34,7 +34,6 @@ public class Ecrit implements Cloneable{
 		SANS_NOUVELLES("Sans nouvelles"),
 		INCONNU("Inconnu"),
 		PUBLIE("Publié"),
-		RESERVE("Réservé"),
 		VALIDE("Validé"),
 		REFUSE("Refusé"),
 		INFRACTION("Infraction"),
@@ -50,6 +49,11 @@ public class Ecrit implements Cloneable{
 		public String toString() {
 			return nom;
 		}
+		
+		public static String[] names = {
+			"Ouvert", "En attente", "Abandonné", "En pause", "Sans nouvelles", "Inconnu", "Publié",
+			"Validé", "Refusé", "Infraction", "Ouvert*"
+		};
 		
 		/**
 		 * Renvoie le Statut correspondant à la chaîne de caractère transmise.
@@ -68,8 +72,6 @@ public class Ecrit implements Cloneable{
 				return INCONNU;
 			} else if(str.equalsIgnoreCase(PUBLIE.nom)) {
 				return PUBLIE;
-			} else if(str.equalsIgnoreCase(RESERVE.nom)) {
-				return OUVERT_PLUS; // TODO delete this
 			} else if(str.equalsIgnoreCase(VALIDE.nom)){
 				return VALIDE;
 			} else if(str.equalsIgnoreCase(REFUSE.nom)) {
@@ -95,6 +97,7 @@ public class Ecrit implements Cloneable{
 		CONTE("Conte"),
 		IDEE("Idée"),
 		RAPPORT("Rapport"),
+		FORMAT_GDI("Format GdI"),
 		AUTRE("Autre");
 		/**
 		 * Équivalent en chaîne de caractère du type.
@@ -104,6 +107,10 @@ public class Ecrit implements Cloneable{
 		Type(String nom) {
 			this.nom = nom;
 		}
+		
+		public static String[] names = {
+			"Conte", "Idée", "Rapport", "Format GdI", "Autre"
+		};
 		
 		public String toString() {
 			return nom;
@@ -119,6 +126,8 @@ public class Ecrit implements Cloneable{
 				return IDEE;
 			} else if(str.equalsIgnoreCase(RAPPORT.nom)) {
 				return RAPPORT;
+			} else if(str.equalsIgnoreCase(FORMAT_GDI.nom)) {
+				return FORMAT_GDI;
 			} else {
 				return AUTRE;
 			}
@@ -203,9 +212,6 @@ public class Ecrit implements Cloneable{
 			auteur = "";
 		if(interesses == null)
 			interesses = new Vector<Interet>();
-		if(status == Status.RESERVE) {
-			status = Status.OUVERT;
-		}
 		if(tags == null)
 			tags = new Vector<String>();
 	}
@@ -485,6 +491,9 @@ public class Ecrit implements Cloneable{
 			break;
 		case RAPPORT:
 			embed.setColor(0x01A9DB);
+			break;
+		case FORMAT_GDI:
+			embed.setColor(0xAE1FF1);
 			break;
 		default:
 			break;

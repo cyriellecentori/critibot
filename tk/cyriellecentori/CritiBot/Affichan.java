@@ -9,13 +9,17 @@ import java.util.stream.Collectors;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.TextChannel;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageDeleteEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
+import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import net.dv8tion.jda.api.requests.RestAction;
 import net.dv8tion.jda.api.requests.restaction.MessageAction;
+import net.dv8tion.jda.api.requests.restaction.WebhookMessageAction;
+import net.dv8tion.jda.api.requests.restaction.interactions.ReplyCallbackAction;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -268,6 +272,11 @@ public class Affichan {
 	 */
 	public static MessageAction sendMessageWithActions(Ecrit e, TextChannel chan) {
 		return chan.sendMessageEmbeds(e.toEmbed()).setActionRow(getActionRow(e));
+	}
+	
+	public static WebhookMessageAction<Message> sendMessageWithActions(Ecrit e, InteractionHook hook) {
+		return hook.sendMessageEmbeds(e.toEmbed()).addActionRow(getActionRow(e));
+
 	}
 	
 	private Message sendMessage(CritiBot bot, Ecrit e) {
