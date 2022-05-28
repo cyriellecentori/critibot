@@ -677,7 +677,7 @@ public class CritiBot implements EventListener {
 						+ "`avant=jj/mm/aaaa` : Les écrits doivent avoir été modifiés pour la dernière fois avant la date indiquée.\n"
 						+ "`après=jj/mm/aaaa` : Les écirts doivent avoir été modifiés pour la dernière fois après la date indiquée.\n", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 3.0");
+				b.setFooter("Version 3.0.1");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message = b.build();
 			}
@@ -722,7 +722,7 @@ public class CritiBot implements EventListener {
 				archiver();
 				ecrits.add(new Ecrit(event.getOption("nom").getAsString(), event.getOption("url").getAsString(), 
 						Type.getType(event.getOption("type").getAsString()), Status.getStatus(event.getOption("statut").getAsString()),
-						event.getOption("url").getAsString()));
+						event.getOption("auteur").getAsString()));
 				event.reply("Ajouté !").queue();
 			}
 			
@@ -2204,6 +2204,9 @@ public class CritiBot implements EventListener {
 					} else if(bie.getButton().getId().endsWith("d")) {
 						archiver();
 						e.liberer(bie.getMember());
+					} else if(bie.getButton().getId().endsWith("u")) {
+						archiver();
+						e.setStatus(Status.OUVERT);
 					}
 					bie.editMessageEmbeds(e.toEmbed()).queue();
 					updateOpen();

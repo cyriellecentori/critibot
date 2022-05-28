@@ -165,7 +165,7 @@ public abstract class BotCommand {
 			
 			if(id_search) {
 				try {
-					Ecrit e = Affichan.searchByHash(Integer.parseInt(id.getAsString()), bot.getEcrits());
+					Ecrit e = Affichan.searchByHash(Integer.parseInt(event.getOption("ecrit").getAsString()), bot.getEcrits());
 					if(e == null)
 						event.reply("Cet écrit n’existe pas.").queue();
 					else
