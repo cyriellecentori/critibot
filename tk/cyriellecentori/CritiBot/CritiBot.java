@@ -677,7 +677,7 @@ public class CritiBot implements EventListener {
 						+ "`avant=jj/mm/aaaa` : Les écrits doivent avoir été modifiés pour la dernière fois avant la date indiquée.\n"
 						+ "`après=jj/mm/aaaa` : Les écirts doivent avoir été modifiés pour la dernière fois après la date indiquée.\n", false);
 				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 3.0.1");
+				b.setFooter("Version 3.0.2");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message = b.build();
 			}
@@ -2082,6 +2082,9 @@ public class CritiBot implements EventListener {
 		}
 		for(Ecrit e : toDel) { // Suppression des doublons.
 			ecrits.remove(e);
+			for(Affichan a : affichans) {
+				a.remove(e);
+			}
 		}
 	}
 	
@@ -2207,6 +2210,9 @@ public class CritiBot implements EventListener {
 					} else if(bie.getButton().getId().endsWith("u")) {
 						archiver();
 						e.setStatus(Status.OUVERT);
+					} else if(bie.getButton().getId().endsWith("p") ) {
+						archiver();
+						e.setStatus(Status.PUBLIE);
 					}
 					bie.editMessageEmbeds(e.toEmbed()).queue();
 					updateOpen();

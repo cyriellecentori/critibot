@@ -249,13 +249,15 @@ public class Affichan {
 		Button refus = Button.danger("e" + e.forumID() + "-r", "Refusé");
 		Button retirer = Button.secondary("e" + e.forumID() + "-d", "Retirer marque");
 		Button up = Button.success("e" + e.forumID() + "-u", "Up");
+		Button pubile = Button.success("e" + e.forumID() + "-p", "Publié");
+		Button no = Button.primary("e" + e.forumID() + "-0", "Aucune action possible").asDisabled();
 		Vector<Button> buttons = new Vector<Button>();
 		
 		if(e.getStatus() == Status.OUVERT || e.getStatus() == Status.OUVERT_PLUS) {
 			buttons.add(marque);
 			buttons.add(critique);
 		}
-		if(e.getStatus() == Status.INFRACTION || e.getStatus() == Status.EN_ATTENTE || e.getStatus() == Status.SANS_NOUVELLES) {
+		if(e.getStatus() == Status.INFRACTION || e.getStatus() == Status.EN_ATTENTE || e.getStatus() == Status.SANS_NOUVELLES || e.getStatus() == Status.EN_PAUSE || e.getStatus() == Status.INCONNU) {
 			buttons.add(up);
 		}
 		if((e.getType() == Type.RAPPORT || e.getType() == Type.IDEE) && e.getStatus() != Status.REFUSE) {
@@ -263,6 +265,12 @@ public class Affichan {
 		}
 		if(e.getStatus() == Status.OUVERT || e.getStatus() == Status.OUVERT_PLUS) {
 			buttons.add(retirer);
+		}
+		if(e.getStatus() == Status.VALIDE) {
+			buttons.add(pubile);
+		}
+		if(buttons.isEmpty()) {
+			buttons.add(no);
 		}
 		return buttons;
 	}
@@ -304,6 +312,19 @@ public class Affichan {
 			Message mmm = mes.get((int) toDel.get(i));
 			mes.remove((int) toDel.get(i));
 			mmm.delete().queue();
+		}
+	}
+	
+	/**
+	 * Supprime l’écrit de la base de données de l’affichan.
+	 */
+	public void remove(Ecrit e) {
+		for(int i = 0; i < ecr.size(); i++) {
+			if(e == ecr.get(i)) { // True equality, since there is no copy it should reference the same object
+				ecr.remove(i);
+				mes.get(i).delete().queue();
+				return;
+			}
 		}
 	}
 	
