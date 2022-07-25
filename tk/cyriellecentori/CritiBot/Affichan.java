@@ -104,6 +104,7 @@ public class Affichan {
 					m.delete().queue();
 				} else {
 					System.out.println("Aucun écrit correspondant au hashcode " + hash + " (nom : " + m.getEmbeds().get(0).getTitle() + ").");
+					m.delete().queue();
 				}
 				
 			} catch(NumberFormatException e) {
@@ -325,6 +326,15 @@ public class Affichan {
 				mes.get(i).delete().queue();
 				return;
 			}
+		}
+	}
+	
+	/**
+	 * Met à jour les affichages de tous les écrits présents
+	 */
+	public void editAll() {
+		for(int i = 0; i < ecr.size(); i++) {
+			mes.get(i).editMessageEmbeds(ecr.get(i).toEmbed()).queue();
 		}
 	}
 	

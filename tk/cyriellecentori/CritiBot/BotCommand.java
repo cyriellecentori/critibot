@@ -1,12 +1,15 @@
 package tk.cyriellecentori.CritiBot;
 
 
+import java.util.List;
 import java.util.Vector;
 
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 
@@ -20,14 +23,27 @@ public abstract class BotCommand {
 	public String name;
 	public OptionData[] options;
 	
+	public static List<Command> commandes = null;
+	
 	public BotCommand(CritiBot bot, String name, String desc, OptionData... options) {
 		this.name = name;
 		this.options = options;
 		JDA jda = bot.jda;
-		if(!bot.beta) {
-			//jda.getGuildById(372635468786827265L).upsertCommand(name, desc).addOptions(options).queue();
-		} else
-			jda.getGuildById(372635468786827265L).upsertCommand(name, desc).addOptions(options).queue();
+		Guild guild = jda.getGuildById(bot.beta ? 372635468786827265L : 547458908361588771L);
+		if(commandes == null) {
+			commandes = guild.retrieveCommands().complete();
+		}
+		boolean found = false;
+		for(Command c : commandes) {
+			if(c.getName().equals(name)) {
+				c.editCommand().addOptions(options).queue();
+				c.editCommand().setDescription(desc).queue();
+				found = true;
+			}
+		}
+		if(!found) {
+			guild.upsertCommand(name, desc).addOptions(options).queue();
+		}
 	}
 	
 	public BotCommand() {

@@ -49,10 +49,13 @@ import net.dv8tion.jda.api.hooks.EventListener;
 import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.Command.Choice;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
+import net.dv8tion.jda.api.interactions.components.Modal;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import tk.cyriellecentori.CritiBot.BotCommand.Alias;
+import tk.cyriellecentori.CritiBot.Ecrit.InteretType;
 import tk.cyriellecentori.CritiBot.Ecrit.Status;
 import tk.cyriellecentori.CritiBot.Ecrit.Type;
 
@@ -188,7 +191,7 @@ public class CritiBot implements EventListener {
 		String data = "";
 		BufferedReader dataFile;
 		try {
-			dataFile = new BufferedReader(new FileReader("critibot.json"));
+			dataFile = new BufferedReader(new FileReader("/home/cyrielle/bots/critibot.json"));
 			while(true) {
 				String str = dataFile.readLine();
 				if(str == null) break;
@@ -336,7 +339,7 @@ public class CritiBot implements EventListener {
 	 * @throws IOException
 	 */
 	public void save() throws IOException {
-		BufferedWriter dataFile = new BufferedWriter(new FileWriter("critibot.json"));
+		BufferedWriter dataFile = new BufferedWriter(new FileWriter("/home/cyrielle/bots/critibot.json"));
 		dataFile.write(gson.toJson(ecrits) + "θ" + lastCheck);
 		dataFile.close();
 	}
@@ -346,7 +349,7 @@ public class CritiBot implements EventListener {
 	 * @param s La chaîne à simplifier.
 	 * @return Une chaîne de caractères simple, seulement en minuscules sans diacritiques.
 	 */
-	static private String basicize(String s) {
+	static public String basicize(String s) {
 		return s.toLowerCase()
 				.replaceAll("é", "e")
 				.replaceAll("ê", "e")
@@ -363,7 +366,8 @@ public class CritiBot implements EventListener {
 				.strip()
 				.replaceAll("ä", "a")
 				.replaceAll("ö", "o")
-				.replaceAll("â", "a");
+				.replaceAll("â", "a")
+				.replaceAll("’", "'");
 		
 	}
 	
@@ -618,6 +622,13 @@ public class CritiBot implements EventListener {
 			choicesTypes.add(new Command.Choice(s, s));
 		}
 		
+		Vector<Command.Choice> choicesMarques = new Vector<Command.Choice>();
+		choicesMarques.add(new Command.Choice("Critique immédiate", "instant"));
+		choicesMarques.add(new Command.Choice("Réservation exclusive", "seul"));
+		choicesMarques.add(new Command.Choice("Réservation ouverte", "ouvert"));
+		choicesMarques.add(new Command.Choice("Simple intérêt", "longterme"));
+		choicesMarques.add(new Command.Choice("Collaboration recherchée", "collab"));
+		
 		OptionData typeOption = new OptionData(OptionType.STRING, "type", "Le type de l’écrit").addChoices(choicesTypes);
 		OptionData statutOption = new OptionData(OptionType.STRING, "statut", "Le statut de l’écrit").addChoices(choicesStatus);
 		OptionData ecritOption = new OptionData(OptionType.STRING, "ecrit", "L’écrit ciblé");
@@ -647,7 +658,7 @@ public class CritiBot implements EventListener {
 						+ "`/lister {Statut} [Type]` : Affiche la liste des écrits avec le statut et du type demandés. Statut et Type peuvent prendre la valeur « Tout ».\n"
 						+ "`/lister_tags` : Affiche tous les tags existants dans la base de données et le nombre d'écrits y étant associés", false);
 				b.addField("Commandes de critiques", "`/marquer {Critère}` : Ajoute une marque d'intérêt à un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
-						+ "`/marquer_pour {Critère} {Nom}` : Marque d'intérêt un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
+						+ "`/marquer_pour {Critère} {Nom} [Type de marque]` : Marque d'intérêt un écrit pour quelqu'un d'autre. Le Critère doit être assez fin pour aboutir à un unique écrit."
 						+ "`/libérer {Critère}` : Supprime votre marque d'intétêt sur un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
 						+ "`/libérer_pour {Critère} {Nom}` : Supprime l'intêret de qulequ'un sur un écrit. Le Critère doit être assez fin pour aboutir à un unique écrit."
 						+ "`/up {Critère}` : Marque un écrit ouvert et le remet au premier plan dans le salon des fils ouverts s'il l'était déjà. Le Critère doit être assez fin pour aboutir à un unique écrit.\n"
@@ -676,8 +687,8 @@ public class CritiBot implements EventListener {
 						+ "`tag&={Critère tag},{Critère tag},…` : Les écrits doivent posséder tous les tags de la liste.\n"
 						+ "`avant=jj/mm/aaaa` : Les écrits doivent avoir été modifiés pour la dernière fois avant la date indiquée.\n"
 						+ "`après=jj/mm/aaaa` : Les écirts doivent avoir été modifiés pour la dernière fois après la date indiquée.\n", false);
-				b.addField("Code source", "Disponible sur [Github](https://github.com/cyriellecentori/critibot).", false);
-				b.setFooter("Version 3.0.2");
+				b.addField("Code source", "Disponible sur [Github](https://github.com/Fondation-SCP/critibot).", false);
+				b.setFooter("Version 3.1");
 				b.setAuthor("Critibot", null, "https://media.discordapp.net/attachments/719194758093733988/842082066589679676/Critiqueurs5.jpg");
 				message = b.build();
 			}
@@ -889,35 +900,6 @@ public class CritiBot implements EventListener {
 		
 		commands.put("s", new BotCommand.Alias(commands.get("rechercher")));
 		commands.put("search", new BotCommand.Alias(this, "search", commands.get("rechercher")));
-		
-		commands.put("marquer", new BotCommand.SearchCommand(this, "marquer", "Marque d’intérêt un écrit.", ecritOption.setRequired(true), idOption) {
-			
-			@Override
-			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
-				archiver();
-				if(e.marquer(message.getMember()))
-					message.getChannel().sendMessage("« " + e.getNom() + " » marqué par " + message.getMember().getEffectiveName() + " !").queue();
-				else if(e.getStatus() != Status.OUVERT_PLUS)
-					message.getChannel().sendMessage("« " + e.getNom() + " » ne peut avoir une marque d'intérêt car il n'est pas ouvert.").queue();
-				else
-					message.getChannel().sendMessage("Vous avez déjà marqué votre intérêt pour « " + e.getNom() + " ».").queue();
-			}
-
-			@Override
-			public void processSlash(Ecrit e, CritiBot bot, SlashCommandInteractionEvent event) {
-				archiver();
-				if(e.marquer(event.getMember()))
-					event.reply("« " + e.getNom() + " » marqué par " + event.getMember().getEffectiveName() + " !").queue();
-				else if(e.getStatus() != Status.OUVERT_PLUS)
-					event.reply("« " + e.getNom() + " » ne peut avoir une marque d'intérêt car il n'est pas ouvert.").queue();
-				else
-					event.reply("Vous avez déjà marqué votre intérêt pour « " + e.getNom() + " ».").queue();
-				
-			}
-		});
-
-		
-		commands.put("m", new BotCommand.Alias(commands.get("marquer")));
 				
 		commands.put("libérer", new BotCommand.SearchCommand(this, "libérer", "Retire une marque d’intérêt.", ecritOption.setRequired(true), idOption) {
 			
@@ -950,6 +932,22 @@ public class CritiBot implements EventListener {
 				
 			}
 		});
+		
+		commands.put("marquer", new BotCommand.SearchCommand(this, "marquer", "Marque d’intérêt un écrit.", ecritOption.setRequired(true), idOption) {
+
+			@Override
+			public void processSlash(Ecrit e, CritiBot bot, SlashCommandInteractionEvent event) {
+				event.reply("Choisissez le type de votre marque.").addActionRow(InteretType.actionRow(e)).setEphemeral(true).queue();
+			}
+			
+			@Override
+			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
+				message.getChannel().sendMessage("Cette commande n’est pas disponible en commande textuelle. Utilisez /editer_marque plutôt.").queue();
+				
+			}
+		});
+		
+		commands.put("m", new BotCommand.Alias(commands.get("marquer")));
 		
 		commands.put("nettoyer", new BotCommand(this, "nettoyer", "Supprime les écrits abandonnés, publiés et refusés.") {
 			
@@ -1076,7 +1074,7 @@ public class CritiBot implements EventListener {
 		});
 		
 		commands.put("marquer_pour", new BotCommand.SearchCommand(this, "marquer_pour", "Marque d’intérêt un écrit pour quelqu’un d’autre.", ecritOption.setRequired(true),
-				new OptionData(OptionType.STRING, "marque", "À qui donner la marque").setRequired(true), idOption) {
+				new OptionData(OptionType.STRING, "marque", "À qui donner la marque").setRequired(true), new OptionData(OptionType.STRING, "type-marque", "Type de Marque").addChoices(choicesMarques), idOption) {
 			
 			@Override
 			public void process(Ecrit e, CritiBot bot, MessageReceivedEvent message, String[] args) {
@@ -1085,7 +1083,7 @@ public class CritiBot implements EventListener {
 					return;
 				}
 				archiver();
-				if(e.marquer(args[1])) {
+				if(e.marquer(args[1], InteretType.INSTANT)) {
 					message.getChannel().sendMessage("« " + e.getNom() + " » marqué d'intêret pour " + args[1] + " !").queue();
 				} else {
 					message.getAuthor().openPrivateChannel().complete().sendMessage("L'écrit « " + e.getNom() + " » ne peut pas être marqué d'intérêt car il n'est pas ouvert.").queue();
@@ -1096,7 +1094,14 @@ public class CritiBot implements EventListener {
 			@Override
 			public void processSlash(Ecrit e, CritiBot bot, SlashCommandInteractionEvent event) {
 				archiver();
-				if(e.marquer(event.getOption("marque").getAsString())) {
+				OptionMapping ito = event.getOption("type-marque");
+				InteretType it;
+				if(ito == null) {
+					it = InteretType.INSTANT;
+				} else {
+					it = InteretType.getInteretType(ito.getAsString());
+				}
+				if(e.marquer(event.getOption("marque").getAsString(), it)) {
 					event.reply("« " + e.getNom() + " » marqué d'intêret pour " + event.getOption("marque").getAsString() + " !").queue();
 				} else {
 					event.reply("L'écrit « " + e.getNom() + " » ne peut pas être marqué d'intérêt car il n'est pas ouvert.").queue();
@@ -1430,7 +1435,7 @@ public class CritiBot implements EventListener {
 			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
 				try {
 					bot.save();
-					message.getChannel().sendFile(new File("critibot.json")).queue();
+					message.getChannel().sendFile(new File("/home/cyrielle/bots/critibot.json")).queue();
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -1444,7 +1449,7 @@ public class CritiBot implements EventListener {
 			public void slash(CritiBot bot, SlashCommandInteractionEvent event) {
 				try {
 					bot.save();
-					event.replyFile(new File("critibot.json")).queue();
+					event.replyFile(new File("/home/cyrielle/bots/critibot.json")).queue();
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -2019,6 +2024,24 @@ public class CritiBot implements EventListener {
 		commands.put("random", new BotCommand.Alias(this, "random", commands.get("aléatoire")));
 		commands.put("r", new BotCommand.Alias(commands.get("aléatoire")));
 		
+		commands.put("edit_all", new BotCommand(this, "edit_all", "Modifie et rafraîchit tous les messages dans les salons d’affichage.") {
+
+			@Override
+			public void execute(CritiBot bot, MessageReceivedEvent message, String[] args) {
+				for(Affichan aff : affichans)
+					aff.editAll();
+				message.getChannel().sendMessage("Fait").queue();
+			}
+
+			@Override
+			public void slash(CritiBot bot, SlashCommandInteractionEvent event) {
+				for(Affichan aff : affichans)
+					aff.editAll();
+				event.reply("Fait").queue();
+			}
+			
+		});
+		
 		commands.put("ancien", new BotCommand(this, "ancien", "Renvoie l’écrit ouvert le plus ancien (parmi les types séléctionnés si spécifiés)",
 				new OptionData(OptionType.STRING, "types", "Types à séléctionner, séparés par des virgules")) {
 
@@ -2194,8 +2217,8 @@ public class CritiBot implements EventListener {
 					bie.editComponents(bie.getMessage().getActionRows().get(0).asDisabled()).queue();
 				} else {
 					if(bie.getButton().getId().endsWith("m")) {
-						archiver();
-						e.marquer(bie.getMember());
+						bie.reply("Choisissez le type de votre marque.").addActionRow(InteretType.actionRow(e)).setEphemeral(true).queue();
+						return;
 					} else if(bie.getButton().getId().endsWith("c")) {
 						archiver();
 						jda.getTextChannelById(organichan).sendMessage("« " + e.getNom() + " » critiqué !").queue();
@@ -2214,7 +2237,7 @@ public class CritiBot implements EventListener {
 						archiver();
 						e.setStatus(Status.PUBLIE);
 					}
-					bie.editMessageEmbeds(e.toEmbed()).queue();
+					bie.editMessageEmbeds(e.toEmbed()).complete();
 					updateOpen();
 					try { // Essaye de sauvegarder
 						save();
@@ -2246,9 +2269,48 @@ public class CritiBot implements EventListener {
 				} catch(NullPointerException e) { // Si le message n’a pas été trouvé (bot reboot), on désactive les boutons
 					bie.editComponents(bie.getMessage().getActionRows().get(0).asDisabled()).queue();
 				}
+			} else if(bie.getButton().getId().startsWith("tm")) { // Boutons de choix de marque d’intérêt
+				int id = Integer.parseInt(bie.getButton().getId().split("-")[1]);
+				Ecrit e = Affichan.searchByHash(id, ecrits);
+				if(e == null) {
+					System.err.println("Attention : bouton ne correspondant à aucun écrit.");
+					bie.editComponents(bie.getMessage().getActionRows().get(0).asDisabled()).queue();
+				} else {
+					archiver();
+					String type = bie.getButton().getId().split("-")[2];
+					if(e.hasMarque(bie.getMember())) {
+						e.liberer(bie.getMember());
+					}
+					InteretType it = InteretType.getInteretType(type);
+					e.marquer(bie.getMember(), it);
+					bie.editMessage("Écrit réservé.").setActionRows().queue();
+				}
+				updateOpen();
+				try { // Essaye de sauvegarder
+					save();
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
 			}
 		} else if(event instanceof MessageReceivedEvent) { // Message reçu
 			MessageReceivedEvent mre = (MessageReceivedEvent) event;
+			
+			// Cas particulier où c’est un message dans le salon organisation et qu’il contient un lien forum
+			// Réserve dans ce cas l’écrit indiqué, le mettant en ouvert s’il ne l’est pas (outrepasse les protections)
+			if(mre.getMessage().getContentRaw().contains("fondationscp.wikidot.com/forum") && mre.getChannel().getIdLong() == organichan) {
+				// Récupère l’ID forum du fil
+				int idForum = Integer.parseInt(mre.getMessage().getContentRaw().split("/t-", 2)[1].split("/")[0]);
+				Ecrit e = Affichan.searchByHash(idForum, ecrits);
+				if(e != null) {
+					archiver();
+					if(e.getStatus() != Status.OUVERT_PLUS) // Évite de supprimer les marques déjà présentes s’il y en a
+						e.setStatus(Status.OUVERT);
+					e.marquer(mre.getMember(), InteretType.INSTANT);
+					updateOpen();
+				} // Sinon tant pis
+				
+			} // Comme il n’y a pas de commande dans le message, la fonction retournera à la prochaine condition
 			
 			// Termine directement si ce n'est pas une commande ou un message envoyé par un bot.
 			if(!mre.getMessage().getContentRaw().startsWith(prefix + "!") || mre.getAuthor().isBot() || mre.getAuthor().getId().equals(jda.getSelfUser().getId()))

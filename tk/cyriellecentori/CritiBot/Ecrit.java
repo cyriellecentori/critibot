@@ -9,11 +9,9 @@ import java.util.Vector;
 import com.google.gson.Gson;
 
 import net.dv8tion.jda.api.EmbedBuilder;
-import net.dv8tion.jda.api.JDA;
-import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
 
 /**
  * Représente un fil sur le forum.
@@ -59,28 +57,28 @@ public class Ecrit implements Cloneable{
 		 * Renvoie le Statut correspondant à la chaîne de caractère transmise.
 		 */
 		public static Status getStatus(String rawStr) {
-			String str = rawStr.strip();
-			if(str.equalsIgnoreCase(OUVERT.nom)) {
+			String str = CritiBot.basicize(rawStr);
+			if(str.equalsIgnoreCase(CritiBot.basicize(OUVERT.nom))) {
 				return OUVERT;
-			} else if(str.equalsIgnoreCase(EN_ATTENTE.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(EN_ATTENTE.nom))) {
 				return EN_ATTENTE;
-			} else if(str.equalsIgnoreCase(EN_PAUSE.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(EN_PAUSE.nom))) {
 				return EN_PAUSE;
-			} else if(str.equalsIgnoreCase(SANS_NOUVELLES.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(SANS_NOUVELLES.nom))) {
 				return SANS_NOUVELLES;
-			} else if(str.equalsIgnoreCase(INCONNU.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(INCONNU.nom))) {
 				return INCONNU;
-			} else if(str.equalsIgnoreCase(PUBLIE.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(PUBLIE.nom))) {
 				return PUBLIE;
-			} else if(str.equalsIgnoreCase(VALIDE.nom)){
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(VALIDE.nom))){
 				return VALIDE;
-			} else if(str.equalsIgnoreCase(REFUSE.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(REFUSE.nom))) {
 				return REFUSE;
-			} else if(str.equalsIgnoreCase(ABANDONNE.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(ABANDONNE.nom))) {
 				return ABANDONNE;
-			} else if(str.equalsIgnoreCase(INFRACTION.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(INFRACTION.nom))) {
 				return INFRACTION;
-			} else if(str.equalsIgnoreCase(OUVERT_PLUS.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(OUVERT_PLUS.nom))) {
 				return OUVERT_PLUS;
 			} else {
 				return INCONNU;
@@ -120,13 +118,13 @@ public class Ecrit implements Cloneable{
 		 * Renvoie le Type correspondant à la chaîne de caractère transmise.
 		 */
 		public static Type getType(String str) {
-			if(str.equalsIgnoreCase(CONTE.nom)) {
+			if(str.equalsIgnoreCase(CritiBot.basicize(CONTE.nom))) {
 				return CONTE;
-			} else if(str.equalsIgnoreCase(IDEE.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(IDEE.nom))) {
 				return IDEE;
-			} else if(str.equalsIgnoreCase(RAPPORT.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(RAPPORT.nom))) {
 				return RAPPORT;
-			} else if(str.equalsIgnoreCase(FORMAT_GDI.nom)) {
+			} else if(str.equalsIgnoreCase(CritiBot.basicize(FORMAT_GDI.nom))) {
 				return FORMAT_GDI;
 			} else {
 				return AUTRE;
@@ -134,13 +132,66 @@ public class Ecrit implements Cloneable{
 		}
 	}
 	
+	public enum InteretType {
+		SEUL("⊙"),
+		INSTANT("⊟"),
+		OUVERT("⋄"),
+		LONGTERME("∙"),
+		COLLAB("⋇");
+		
+		public final String logo;
+		
+		public static Button[] actionRow(Ecrit e) {
+			return new Button[] {Button.secondary("tm-" + e.hashCode() + "-seul", "⊙ Exclusif"),
+					Button.secondary("tm-" + e.hashCode() + "-instant", "⊟ Immédiat"),
+					Button.secondary("tm-" + e.hashCode() + "-ouvert", "⋄ Ouvert"),
+					Button.secondary("tm-" + e.hashCode() + "-longterme", "∙ Intérêt simple"),
+					Button.secondary("tm-" + e.hashCode() + "-collab", "⋇ Collab recherchée")};
+		}
+		
+		InteretType(String logo) {
+			this.logo = logo;
+		}
+		
+		public String toString() {
+			return logo;
+		}
+		
+		public static InteretType getInteretType(String str) {
+			if(str.equals("seul")) {
+				return SEUL;
+			} else if(str.equals("instant")) {
+				return INSTANT;
+			} else if(str.equals("ouvert")) {
+				return OUVERT;
+			} else if(str.equals("longterme")) {
+				return LONGTERME;
+			} else if(str.equals("collab")) {
+				return COLLAB;
+			} else {
+				return OUVERT;
+			}
+		}
+	}
+	
 	public class Interet {
 		public final String name;
 		public final long date;
+		public InteretType type = InteretType.OUVERT;
+		public final long member;
 		
-		public Interet(String name, long date) {
+		public Interet(String name, long date, InteretType type) {
 			this.name = name;
 			this.date = date;
+			this.type = type;
+			this.member = 0;
+		}
+		
+		public Interet(Member member, long date, InteretType type) {
+			this.name = member.getEffectiveName();
+			this.date = date;
+			this.type = type;
+			this.member = member.getIdLong();
 		}
 
 		public String getDate() {
@@ -148,14 +199,6 @@ public class Ecrit implements Cloneable{
 		}
 	}
 	
-	public class InteretMembre extends Interet {
-		public final long member;
-		
-		public InteretMembre(Member member, long date) {
-			super(member.getEffectiveName(), date);
-			this.member = member.getIdLong();
-		}
-	}
 	/**
 	 * Nom de l'écrit.
 	 */
@@ -214,6 +257,11 @@ public class Ecrit implements Cloneable{
 			interesses = new Vector<Interet>();
 		if(tags == null)
 			tags = new Vector<String>();
+		for(Interet i : interesses) {
+			if(i.type == null) {
+				i.type = InteretType.OUVERT;
+			}
+		}
 	}
 	
 	public String toString() {
@@ -253,19 +301,17 @@ public class Ecrit implements Cloneable{
 	 * @param member Membre du Discord interessé par l'écrit.
 	 * @return `true` s'il a été possible de marquer l'intérêt.
 	 */
-	public boolean marquer(Member member) {
+	public boolean marquer(Member member, InteretType type) {
 		// Vérifie si l'écrit est réservable.
 		if(!(status == Status.OUVERT || status == Status.OUVERT_PLUS))
 			return false;
 		// Remplit les informations de réservation.
 		for(Interet i : interesses) {
-			if(i instanceof InteretMembre) {
-				if(((InteretMembre) i).member == member.getIdLong()) {
-					return false;
-				}
+			if(i.member == member.getIdLong()) {
+				return false;
 			}
 		}
-		Interet i = new InteretMembre(member, System.currentTimeMillis());
+		Interet i = new Interet(member, System.currentTimeMillis(), type);
 		interesses.add(i);
 		status = Status.OUVERT_PLUS;
 		edited = true;
@@ -277,12 +323,12 @@ public class Ecrit implements Cloneable{
 	 * @param member Nom de l'utilisateur interessé par l'écrit.
 	 * @return `true` s'il a été possible de marquer l'intérêt.
 	 */
-	public boolean marquer(String name) {
+	public boolean marquer(String name, InteretType type) {
 		// Vérifie si l'écrit est marquable.
 		if(status != Status.OUVERT && status != Status.OUVERT_PLUS)
 			return false;
 		// Remplit les informations de marquage.
-		Interet i = new Interet(name, System.currentTimeMillis());
+		Interet i = new Interet(name, System.currentTimeMillis(),type);
 		interesses.add(i);
 		status = Status.OUVERT_PLUS;
 		edited = true;
@@ -317,8 +363,8 @@ public class Ecrit implements Cloneable{
 	public boolean liberer(Member member) {
 		Interet toDel = null;
 		for(Interet i : interesses) {
-			if(i instanceof InteretMembre) {
-				if(((InteretMembre) i).member == member.getIdLong()) {
+			if(i instanceof Interet) {
+				if(i.member == member.getIdLong()) {
 					toDel = i;
 				}
 			}
@@ -331,6 +377,23 @@ public class Ecrit implements Cloneable{
 		}
 		edited = true;
 		return true;
+	}
+	
+	public boolean hasMarque(Member member) {
+		for(Interet i : interesses) {
+			if(i.member == member.getIdLong()) {
+				return true;
+			}
+		}
+		return false;
+	}
+		
+	public boolean hasMarque(String name) {
+		for(Interet i : interesses) {
+			if(i.name.equals(name))
+				return true;
+		}
+		return false;
 	}
 	
 	
@@ -465,7 +528,7 @@ public class Ecrit implements Cloneable{
 		if(status == Status.OUVERT_PLUS) {
 			String interesList = "";
 			for(Interet i : interesses) {
-				interesList += i.name + " le " + i.getDate() + "\n";
+				interesList += i.type.toString() + " " + i.name + " le " + i.getDate() + "\n";
 			}
 			embed.addField("Marques d'intérêt", interesList, false);
 		}
