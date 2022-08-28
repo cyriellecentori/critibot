@@ -117,7 +117,8 @@ public class Ecrit implements Cloneable{
 		/**
 		 * Renvoie le Type correspondant à la chaîne de caractère transmise.
 		 */
-		public static Type getType(String str) {
+		public static Type getType(String rawStr) {
+			String str = CritiBot.basicize(rawStr);
 			if(str.equalsIgnoreCase(CritiBot.basicize(CONTE.nom))) {
 				return CONTE;
 			} else if(str.equalsIgnoreCase(CritiBot.basicize(IDEE.nom))) {
