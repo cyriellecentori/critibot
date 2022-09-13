@@ -293,7 +293,7 @@ public class CritiBot implements EventListener {
 					if(unclean.contains("SCP") && unclean.contains("FR")) {
 						unclean = unclean.split("FR",2)[1];
 					}
-					while(unclean.startsWith(" ") || unclean.startsWith(":")) {
+					while(unclean.startsWith(" ") || unclean.startsWith(":") || unclean.startsWith("-")) {
 						unclean = unclean.substring(1);
 					}
 					if(unclean.startsWith("\"")) {
